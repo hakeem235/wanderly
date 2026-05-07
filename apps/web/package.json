@@ -20,6 +20,8 @@
     "@radix-ui/react-separator": "^1.1.0",
     "@radix-ui/react-slot": "^1.1.0",
     "@radix-ui/react-toast": "^1.2.2",
+    "@simplewebauthn/browser": "^13.3.0",
+    "@simplewebauthn/server": "^13.3.0",
     "@wanderly/db": "workspace:*",
     "@wanderly/ui": "workspace:*",
     "class-variance-authority": "^0.7.1",
