@@ -1,0 +1,11 @@
+# Local dev overrides — not committed to production
+# Usage: docker compose up (automatically picks up this file)
+version: "3.9"
+
+services:
+  postgres:
+    ports:
+      - "5432:5432"
+  redis:
+    ports:
+      - "6379:6379"
