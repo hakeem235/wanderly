@@ -1,16 +1,19 @@
 import { redirect } from "next/navigation";
-import { currentUser } from "@clerk/nextjs/server";
+import { auth, clerkClient } from "@clerk/nextjs/server";
 import { connectDB, Trip } from "@wanderly/db";
 import { TripCard, type TripCardData } from "@/components/trips/trip-card";
 import { CreateTripDialog } from "@/components/trips/create-trip-dialog";
 
 export default async function DashboardPage() {
-  const user = await currentUser();
-  if (!user) redirect("/login");
+  const { userId } = await auth();
+  if (!userId) redirect("/login");
+
+  const client = await clerkClient();
+  const user = await client.users.getUser(userId);
 
   await connectDB();
 
-  const raw = await Trip.find({ ownerId: user.id })
+  const raw = await Trip.find({ ownerId: userId })
     .sort({ startDate: 1 })
     .lean();
 
@@ -30,10 +33,7 @@ export default async function DashboardPage() {
   const destinations = new Set(trips.map((t) => t.destination.split(",").at(0)!.trim())).size;
 
   const greeting = getGreeting();
-  const firstName =
-    user.firstName ??
-    user.emailAddresses[0]?.emailAddress?.split("@")[0] ??
-    "there";
+  const firstName = user?.firstName ?? user?.emailAddresses[0]?.emailAddress?.split("@")[0] ?? "there";
 
   return (
     <div className="space-y-10">

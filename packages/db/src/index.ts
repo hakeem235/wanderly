@@ -1,8 +1,5 @@
 import mongoose from "mongoose";
 
-const MONGODB_URI = process.env.MONGODB_URI as string;
-if (!MONGODB_URI) throw new Error("MONGODB_URI is not set");
-
 declare global {
   // eslint-disable-next-line no-var
   var _mongooseConn: typeof mongoose | null;
@@ -14,12 +11,20 @@ if (!global._mongooseConn) global._mongooseConn = null;
 if (!global._mongoosePromise) global._mongoosePromise = null;
 
 export async function connectDB(): Promise<typeof mongoose> {
-  if (global._mongooseConn) return global._mongooseConn;
+  if (global._mongooseConn?.connection?.readyState === 1) return global._mongooseConn;
 
+  const uri = process.env.MONGODB_URI;
+  if (!uri) throw new Error("MONGODB_URI is not set");
+
+  // Reset stale promise so we retry on connection failure
   if (!global._mongoosePromise) {
-    global._mongoosePromise = mongoose.connect(MONGODB_URI, {
-      bufferCommands: false,
-    });
+    global._mongoosePromise = mongoose
+      .connect(uri, { serverSelectionTimeoutMS: 5000 })
+      .catch((err) => {
+        global._mongoosePromise = null;
+        global._mongooseConn = null;
+        throw err;
+      });
   }
 
   global._mongooseConn = await global._mongoosePromise;
@@ -53,4 +58,3 @@ export type { DocumentDoc, DocType } from "./models/document";
 
 export { Passkey } from "./models/passkey";
 export type { PasskeyDoc } from "./models/passkey";
-
