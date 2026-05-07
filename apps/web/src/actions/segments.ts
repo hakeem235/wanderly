@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
 import { connectDB, Segment, Trip } from "@wanderly/db";
 import { z } from "zod";
+import { withSpan } from "@/lib/tracing";
 
 const CreateSegmentInput = z.object({
   tripId:   z.string().min(1),
@@ -21,32 +22,36 @@ export async function createSegment(data: CreateSegmentData) {
   const { userId } = await auth();
   if (!userId) redirect("/login");
 
-  const v = CreateSegmentInput.parse(data);
-  await connectDB();
+  return withSpan("segment.create", { "user.id": userId, "segment.type": data.type ?? "" }, async () => {
+    const v = CreateSegmentInput.parse(data);
+    await connectDB();
 
-  const trip = await Trip.findOne({ _id: v.tripId, ownerId: userId });
-  if (!trip) throw new Error("Trip not found");
+    const trip = await Trip.findOne({ _id: v.tripId, ownerId: userId });
+    if (!trip) throw new Error("Trip not found");
 
-  await Segment.create({
-    tripId:   v.tripId,
-    type:     v.type,
-    title:    v.title,
-    startsAt: new Date(v.startsAt),
-    endsAt:   v.endsAt ? new Date(v.endsAt) : undefined,
-    payload:  v.payload,
+    await Segment.create({
+      tripId:   v.tripId,
+      type:     v.type,
+      title:    v.title,
+      startsAt: new Date(v.startsAt),
+      endsAt:   v.endsAt ? new Date(v.endsAt) : undefined,
+      payload:  v.payload,
+    });
+
+    revalidatePath(`/trips/${v.tripId}`);
   });
-
-  revalidatePath(`/trips/${v.tripId}`);
 }
 
 export async function deleteSegment(tripId: string, segmentId: string) {
   const { userId } = await auth();
   if (!userId) redirect("/login");
 
-  await connectDB();
-  const trip = await Trip.findOne({ _id: tripId, ownerId: userId });
-  if (!trip) throw new Error("Trip not found");
+  return withSpan("segment.delete", { "user.id": userId, "trip.id": tripId, "segment.id": segmentId }, async () => {
+    await connectDB();
+    const trip = await Trip.findOne({ _id: tripId, ownerId: userId });
+    if (!trip) throw new Error("Trip not found");
 
-  await Segment.findByIdAndDelete(segmentId);
-  revalidatePath(`/trips/${tripId}`);
+    await Segment.findByIdAndDelete(segmentId);
+    revalidatePath(`/trips/${tripId}`);
+  });
 }

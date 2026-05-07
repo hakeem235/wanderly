@@ -27,6 +27,19 @@ export const metadata: Metadata = {
   description:
     "Manage every flight, hotel, and activity in one timeline. Search, book, and plan with AI — all in one place.",
   manifest: "/manifest.json",
+  themeColor: "#B85C38",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Wanderly",
+  },
+  icons: {
+    icon: [
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/icon-192.png", sizes: "192x192" }],
+  },
 };
 
 export default function RootLayout({

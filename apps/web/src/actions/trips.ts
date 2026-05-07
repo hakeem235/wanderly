@@ -6,6 +6,7 @@ import { auth } from "@clerk/nextjs/server";
 import { connectDB, Trip, Segment, TripShare } from "@wanderly/db";
 import { z } from "zod";
 import crypto from "crypto";
+import { withSpan } from "@/lib/tracing";
 
 const CreateTripInput = z.object({
   title:       z.string().min(1, "Title is required").max(100),
@@ -22,22 +23,24 @@ export async function createTrip(data: CreateTripData) {
   const { userId } = await auth();
   if (!userId) redirect("/login");
 
-  const v = CreateTripInput.parse(data);
-  await connectDB();
+  return withSpan("trip.create", { "user.id": userId }, async () => {
+    const v = CreateTripInput.parse(data);
+    await connectDB();
 
-  const trip = await Trip.create({
-    ownerId:     userId,
-    title:       v.title,
-    destination: v.destination,
-    startDate:   new Date(v.startDate),
-    endDate:     new Date(v.endDate),
-    budgetCents: v.budgetCents,
-    currency:    v.currency,
-    status:      "PLANNING",
+    const trip = await Trip.create({
+      ownerId:     userId,
+      title:       v.title,
+      destination: v.destination,
+      startDate:   new Date(v.startDate),
+      endDate:     new Date(v.endDate),
+      budgetCents: v.budgetCents,
+      currency:    v.currency,
+      status:      "PLANNING",
+    });
+
+    revalidatePath("/dashboard");
+    return { id: trip._id.toString() };
   });
-
-  revalidatePath("/dashboard");
-  return { id: trip._id.toString() };
 }
 
 export async function updateTrip(
@@ -47,35 +50,40 @@ export async function updateTrip(
   const { userId } = await auth();
   if (!userId) redirect("/login");
 
-  await connectDB();
-  const trip = await Trip.findOne({ _id: id, ownerId: userId });
-  if (!trip) throw new Error("Trip not found");
+  return withSpan("trip.update", { "user.id": userId, "trip.id": id }, async () => {
+    await connectDB();
+    const trip = await Trip.findOne({ _id: id, ownerId: userId });
+    if (!trip) throw new Error("Trip not found");
 
-  if (data.title)       trip.title       = data.title;
-  if (data.destination) trip.destination = data.destination;
-  if (data.startDate)   trip.startDate   = new Date(data.startDate);
-  if (data.endDate)     trip.endDate     = new Date(data.endDate);
-  if (data.budgetCents !== undefined) trip.budgetCents = data.budgetCents;
-  if (data.currency)    trip.currency    = data.currency;
+    if (data.title)       trip.title       = data.title;
+    if (data.destination) trip.destination = data.destination;
+    if (data.startDate)   trip.startDate   = new Date(data.startDate);
+    if (data.endDate)     trip.endDate     = new Date(data.endDate);
+    if (data.budgetCents !== undefined) trip.budgetCents = data.budgetCents;
+    if (data.currency)    trip.currency    = data.currency;
 
-  await trip.save();
-  revalidatePath(`/trips/${id}`);
-  revalidatePath("/dashboard");
+    await trip.save();
+    revalidatePath(`/trips/${id}`);
+    revalidatePath("/dashboard");
+  });
 }
 
 export async function deleteTrip(id: string) {
   const { userId } = await auth();
   if (!userId) redirect("/login");
 
-  await connectDB();
-  const trip = await Trip.findOne({ _id: id, ownerId: userId });
-  if (!trip) throw new Error("Trip not found");
+  await withSpan("trip.delete", { "user.id": userId, "trip.id": id }, async () => {
+    await connectDB();
+    const trip = await Trip.findOne({ _id: id, ownerId: userId });
+    if (!trip) throw new Error("Trip not found");
 
-  await Segment.deleteMany({ tripId: id });
-  await TripShare.deleteMany({ tripId: id });
-  await trip.deleteOne();
+    await Segment.deleteMany({ tripId: id });
+    await TripShare.deleteMany({ tripId: id });
+    await trip.deleteOne();
 
-  revalidatePath("/dashboard");
+    revalidatePath("/dashboard");
+  });
+
   redirect("/dashboard");
 }
 
@@ -83,16 +91,18 @@ export async function createShareLink(tripId: string) {
   const { userId } = await auth();
   if (!userId) redirect("/login");
 
-  await connectDB();
-  const trip = await Trip.findOne({ _id: tripId, ownerId: userId });
-  if (!trip) throw new Error("Trip not found");
+  return withSpan("trip.share.create", { "user.id": userId, "trip.id": tripId }, async () => {
+    await connectDB();
+    const trip = await Trip.findOne({ _id: tripId, ownerId: userId });
+    if (!trip) throw new Error("Trip not found");
 
-  const existing = await TripShare.findOne({ tripId, role: "VIEWER" });
-  if (existing) return { token: existing.token as string };
+    const existing = await TripShare.findOne({ tripId, role: "VIEWER" });
+    if (existing) return { token: existing.token as string };
 
-  const token = crypto.randomBytes(16).toString("hex");
-  await TripShare.create({ tripId, token, role: "VIEWER" });
+    const token = crypto.randomBytes(16).toString("hex");
+    await TripShare.create({ tripId, token, role: "VIEWER" });
 
-  revalidatePath(`/trips/${tripId}`);
-  return { token };
+    revalidatePath(`/trips/${tripId}`);
+    return { token };
+  });
 }

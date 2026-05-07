@@ -3,6 +3,7 @@ const nextConfig = {
   output: "standalone",
   experimental: {
     typedRoutes: false,
+    instrumentationHook: true,
   },
   transpilePackages: ["@wanderly/ui", "@wanderly/db"],
   webpack(config) {
