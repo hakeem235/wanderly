@@ -1,9 +1,7 @@
 import Link from "next/link";
-import { auth, signOut } from "@/auth";
+import { UserButton } from "@clerk/nextjs";
 
 export async function AppNav() {
-  const session = await auth();
-
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-cream/80 backdrop-blur-sm">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
@@ -42,59 +40,17 @@ export async function AppNav() {
 
         {/* Right side */}
         <div className="flex items-center gap-4">
-          {session ? (
-            <>
-              <Link
-                href="/plan"
-                className="hidden sm:inline-flex items-center gap-1.5 rounded-lg bg-terracotta px-4 py-2 text-sm font-medium text-paper hover:bg-terracotta-deep transition-colors"
-              >
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 4v16m8-8H4"
-                  />
-                </svg>
-                New trip
-              </Link>
+          <Link
+            href="/plan"
+            className="hidden sm:inline-flex items-center gap-1.5 rounded-lg bg-terracotta px-4 py-2 text-sm font-medium text-paper hover:bg-terracotta-deep transition-colors"
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            New trip
+          </Link>
 
-              {/* Avatar dropdown */}
-              <div className="relative">
-                <div className="h-8 w-8 rounded-full bg-teal flex items-center justify-center text-paper text-sm font-medium select-none cursor-pointer">
-                  {session.user?.name?.[0]?.toUpperCase() ??
-                    session.user?.email?.[0]?.toUpperCase() ??
-                    "?"}
-                </div>
-              </div>
-
-              <form
-                action={async () => {
-                  "use server";
-                  await signOut({ redirectTo: "/" });
-                }}
-              >
-                <button
-                  type="submit"
-                  className="text-xs text-ink-mute hover:text-ink transition-colors"
-                >
-                  Sign out
-                </button>
-              </form>
-            </>
-          ) : (
-            <Link
-              href="/login"
-              className="text-sm font-medium text-ink hover:text-terracotta transition-colors"
-            >
-              Sign in
-            </Link>
-          )}
+          <UserButton afterSignOutUrl="/" />
         </div>
       </div>
     </header>

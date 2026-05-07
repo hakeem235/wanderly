@@ -3,22 +3,19 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "migrate": "prisma migrate dev",
-    "migrate:deploy": "prisma migrate deploy",
-    "studio": "prisma studio",
-    "seed": "tsx prisma/seed.ts",
-    "generate": "prisma generate",
+    "seed": "tsx src/seed.ts",
     "typecheck": "tsc --noEmit"
   },
   "exports": {
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@prisma/client": "^5.22.0"
+    "mongoose": "^8.9.0",
+    "mongodb": "^6.12.0"
   },
   "devDependencies": {
+    "@types/node": "^20.16.5",
     "@wanderly/config": "workspace:*",
-    "prisma": "^5.22.0",
     "tsx": "^4.19.2",
     "typescript": "^5.5.4"
   }

@@ -1,23 +1,16 @@
-import { auth } from "@/auth";
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
-const publicPaths = ["/", "/login", "/login/verify", "/share"];
+const isPublicRoute = createRouteMatcher([
+  "/",
+  "/login(.*)",
+  "/share/(.*)",
+  "/api/health",
+]);
 
-export default auth((req: NextRequest & { auth: unknown }) => {
-  const { pathname } = req.nextUrl;
-  const isPublic = publicPaths.some(
-    (p) => pathname === p || pathname.startsWith(`${p}/`)
-  );
-
-  if (!isPublic && !req.auth) {
-    const loginUrl = new URL("/login", req.url);
-    loginUrl.searchParams.set("callbackUrl", pathname);
-    return NextResponse.redirect(loginUrl);
-  }
-  return NextResponse.next();
+export default clerkMiddleware(async (auth, req) => {
+  if (!isPublicRoute(req)) await auth.protect();
 });
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|patterns).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|patterns|.*\\..*).*)"],
 };

@@ -16,7 +16,7 @@ You are scaffolding **Wanderly**, a SaaS travel platform that does three things:
 
 **Design direction:** editorial travel-magazine, not enterprise SaaS. Warmth and craft over density and chrome. Treat trips as artifacts worth keeping.
 
-You are working with **Ahmed** (QA/automation background, comfortable with Next.js, Prisma, Postgres, Redis, n8n, Docker, Claude API). Default to mainstream, well-documented choices. No exotic frameworks.
+You are working with **Ahmed** (QA/automation background, comfortable with Next.js, Mongoose, MongoDB, Redis, n8n, Docker, Claude API). Default to mainstream, well-documented choices. No exotic frameworks.
 
 ---
 
@@ -24,21 +24,21 @@ You are working with **Ahmed** (QA/automation background, comfortable with Next.
 
 ```
 Frontend:        Next.js 14 (App Router) + TypeScript (strict) + Tailwind v3 + shadcn/ui
-Backend (web):   Next.js Route Handlers + Prisma 5
-Backend (search): Go 1.22 + chi router + sqlc        (separate service)
-Database:        PostgreSQL 16
+Backend (web):   Next.js Route Handlers + Mongoose 8
+Backend (search): Go 1.22 + chi router (separate service)
+Database:        MongoDB 7 (app data) + PostgreSQL 16 (n8n only)
 Cache:           Redis 7
 Search index:    Typesense
 AI:              Anthropic SDK (Claude Sonnet 4 — model id: claude-sonnet-4-20250514)
 Payments:        Stripe (Subscriptions + PaymentIntents + Connect)
 Email:           Resend + React Email
-Workflows:       n8n (self-hosted)
+Workflows:       n8n (self-hosted, backed by Postgres)
 Maps:            Mapbox GL JS
-Auth:            Auth.js v5 + Postgres adapter + Passkeys
+Auth:            Auth.js v5 + MongoDB adapter + Passkeys
 Validation:      Zod (everywhere — never trust unvalidated JSON)
 Observability:   OpenTelemetry → Grafana Cloud
 Errors:          Sentry
-CI/CD:           GitHub Actions → Fly.io (web + Go) + Neon (Postgres) + Upstash (Redis)
+CI/CD:           GitHub Actions → Fly.io (web + Go) + MongoDB Atlas (prod) + Upstash (Redis)
 Package mgr:     pnpm (workspaces)
 Node:            20 LTS
 ```
@@ -49,8 +49,6 @@ If you think a different choice is better, **flag it as a question** — do not 
 
 ## 2. Repo Structure
 
-Create a pnpm monorepo:
-
 ```
 wanderly/
 ├── apps/
@@ -58,14 +56,14 @@ wanderly/
 │   ├── search/                 # Go microservice — provider aggregation
 │   └── workers/                # n8n workflows + scheduled jobs (TS)
 ├── packages/
-│   ├── db/                     # Prisma schema + migrations + seed
+│   ├── db/                     # Mongoose models + seed (no migrations — schemaless)
 │   ├── sdk/                    # Generated TS client (OpenAPI → ts-rest or zodios)
 │   ├── ui/                     # shadcn/ui re-exports + Wanderly tokens
 │   ├── ai/                     # Claude agent runtime + tool definitions
 │   ├── providers/              # Shared provider adapter types (TS)
 │   └── config/                 # Shared eslint, tsconfig, tailwind preset
 ├── infra/
-│   ├── docker-compose.yml      # local dev: pg, redis, typesense, n8n
+│   ├── docker-compose.yml      # local dev: mongo, postgres (n8n), redis, typesense, n8n
 │   ├── fly/                    # fly.toml per app
 │   └── github/                 # actions
 ├── docs/
@@ -86,18 +84,18 @@ Do not skip ahead. Each phase ships to a deployed preview environment before the
 
 ### Phase 1 — Foundation (Days 1–4)
 
-- [ ] Init monorepo, pnpm workspaces, turbo, shared eslint/tsconfig
-- [ ] Docker compose for local dev (Postgres 16, Redis 7, Typesense, n8n)
-- [ ] `packages/db` — Prisma schema (see §5), migrations, seed script
-- [ ] `apps/web` — Next.js 14 scaffold, App Router, Tailwind, shadcn/ui installed
-- [ ] Auth.js v5 with email magic-link + Passkeys + Postgres adapter
-- [ ] Design tokens from `docs/DESIGN.md` wired into Tailwind config
-- [ ] Base layout: app shell with nav, logo, search, avatar (per Screen 02 in design system)
-- [ ] One protected route renders user's email — proves auth round trip works
-- [ ] GitHub Actions: lint, typecheck, test, build on PR
+- [x] Init monorepo, pnpm workspaces, turbo, shared eslint/tsconfig
+- [x] Docker compose for local dev (MongoDB 7, Postgres 16 for n8n, Redis 7, Typesense, n8n)
+- [x] `packages/db` — Mongoose models (see §5), seed script
+- [x] `apps/web` — Next.js 14 scaffold, App Router, Tailwind, shadcn/ui installed
+- [x] Auth.js v5 with email magic-link + MongoDB adapter
+- [x] Design tokens from `docs/DESIGN.md` wired into Tailwind config
+- [x] Base layout: app shell with nav, logo, search, avatar (per Screen 02 in design system)
+- [x] One protected route renders user's email — proves auth round trip works
+- [x] GitHub Actions: lint, typecheck, test, build on PR
 - [ ] Deploy to Fly.io preview env
 
-**DoD:** I can sign up, log in via passkey, see a logged-in screen at `app.wanderly.local`.
+**DoD:** I can sign up, log in via magic link, see a logged-in screen at `app.wanderly.local`.
 
 ### Phase 2 — Trip CRUD + Manual Entry (Days 5–9)
 
@@ -147,7 +145,7 @@ Do not skip ahead. Each phase ships to a deployed preview environment before the
 
 ### Phase 6 — AI Itinerary Agent (Days 25–30)
 
-- [ ] `packages/ai` — agent runtime, tool definitions, conversation state (Postgres)
+- [ ] `packages/ai` — agent runtime, tool definitions, conversation state (MongoDB)
 - [ ] Tools (see §8): `search_flights`, `search_hotels`, `search_activities`, `get_destination_info`, `save_itinerary`
 - [ ] System prompt enforces grounding rules (no inventory hallucination)
 - [ ] SSE-streamed planning UI (Screen 04) — tool calls visible, generated plan rendering live
@@ -212,151 +210,41 @@ export const colors = {
 
 ---
 
-## 5. Database — Prisma Schema (start here)
+## 5. Database — Mongoose Models
 
-Create `packages/db/prisma/schema.prisma` with this exactly. Migrations land before any app code.
+All models live in `packages/db/src/models/`. No migrations — MongoDB is schemaless; Mongoose enforces shape at the app layer. Run `pnpm db:seed` to populate dev data.
 
-```prisma
-generator client { provider = "prisma-client-js" }
-datasource db { provider = "postgresql"; url = env("DATABASE_URL") }
+### Connection
 
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  locale    String   @default("en")
-  trips     Trip[]
-  bookings  Booking[]
-  subscription Subscription?
-  passkeys  Passkey[]
-  createdAt DateTime @default(now())
-}
-
-model Trip {
-  id          String   @id @default(cuid())
-  ownerId     String
-  owner       User     @relation(fields: [ownerId], references: [id])
-  title       String
-  destination String   // primary destination, e.g. "Tokyo, JP"
-  startDate   DateTime
-  endDate     DateTime
-  status      TripStatus @default(PLANNING)
-  budgetCents Int?
-  currency    String   @default("USD")
-  travelers   Traveler[]
-  segments    Segment[]
-  bookings    Booking[]
-  documents   Document[]
-  shares      TripShare[]
-  metadata    Json     @default("{}")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  @@index([ownerId, startDate])
-}
-
-enum TripStatus { PLANNING BOOKED ONGOING COMPLETED CANCELLED }
-
-model Segment {
-  id        String      @id @default(cuid())
-  tripId    String
-  trip      Trip        @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  type      SegmentType
-  startsAt  DateTime
-  endsAt    DateTime?
-  title     String
-  payload   Json        // type-specific, validated by Zod schemas in app layer
-  bookingId String?
-  booking   Booking?    @relation(fields: [bookingId], references: [id])
-  orderHint Int         @default(0)
-  @@index([tripId, startsAt])
-}
-
-enum SegmentType { FLIGHT LODGING ACTIVITY TRANSFER FOOD NOTE }
-
-model Booking {
-  id              String   @id @default(cuid())
-  userId          String
-  tripId          String?
-  provider        String
-  providerRef     String
-  status          BookingStatus
-  totalCents      Int
-  commissionCents Int      @default(0)
-  currency        String
-  rawOffer        Json
-  stripePiId      String?  @unique
-  idempotencyKey  String   @unique
-  createdAt       DateTime @default(now())
-  confirmedAt     DateTime?
-  segments        Segment[]
-  @@index([userId, createdAt])
-  @@index([provider, providerRef])
-}
-
-enum BookingStatus { QUOTED PENDING CONFIRMED CANCELLED FAILED }
-
-model Subscription {
-  id                String   @id @default(cuid())
-  userId            String   @unique
-  user              User     @relation(fields: [userId], references: [id])
-  stripeCustomerId  String   @unique
-  stripeSubId       String?  @unique
-  plan              Plan     @default(FREE)
-  currentPeriodEnd  DateTime?
-  cancelAtPeriodEnd Boolean  @default(false)
-}
-
-enum Plan { FREE PRO TEAM }
-
-model TripShare {
-  id        String    @id @default(cuid())
-  tripId    String
-  trip      Trip      @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  email     String?
-  token     String    @unique
-  role      ShareRole @default(VIEWER)
-  expiresAt DateTime?
-}
-
-enum ShareRole { VIEWER EDITOR }
-
-model Traveler {
-  id          String   @id @default(cuid())
-  tripId      String
-  trip        Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  firstName   String
-  lastName    String
-  dateOfBirth DateTime?
-  passportNum String?  // encrypted at app layer with KMS
-  nationality String?
-}
-
-model Document {
-  id        String   @id @default(cuid())
-  tripId    String
-  trip      Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  type      DocType
-  s3Key     String
-  filename  String
-  parsed    Json?
-  createdAt DateTime @default(now())
-}
-
-enum DocType { PASSPORT VISA TICKET RECEIPT OTHER }
-
-model Passkey {
-  id           String  @id @default(cuid())
-  userId       String
-  user         User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  credentialId Bytes   @unique
-  publicKey    Bytes
-  counter      BigInt
-  deviceType   String
-  createdAt    DateTime @default(now())
-}
+```ts
+// packages/db/src/index.ts
+export async function connectDB(): Promise<typeof mongoose>
+export { default as clientPromise } from "./client"; // native MongoClient for Auth.js
 ```
 
-After this lands, run `pnpm db:migrate dev --name initial` and commit the migration.
+### Environment variable
+
+```
+MONGODB_URI="mongodb://wanderly:wanderly@localhost:27017/wanderly?authSource=admin"
+```
+
+### Models summary
+
+| Model | Key fields | Notes |
+|---|---|---|
+| `User` | email, name, locale, emailVerified | Auth.js owns this collection |
+| `Trip` | ownerId, title, destination, startDate, endDate, status, budgetCents, currency | status: PLANNING \| BOOKED \| ONGOING \| COMPLETED \| CANCELLED |
+| `Segment` | tripId, type, startsAt, endsAt, title, payload, bookingId, orderHint | type: FLIGHT \| LODGING \| ACTIVITY \| TRANSFER \| FOOD \| NOTE; payload validated by Zod |
+| `Booking` | userId, tripId, provider, providerRef, status, totalCents, currency, idempotencyKey | status: QUOTED \| PENDING \| CONFIRMED \| CANCELLED \| FAILED |
+| `Subscription` | userId, stripeCustomerId, stripeSubId, plan | plan: FREE \| PRO \| TEAM |
+| `TripShare` | tripId, token, role, expiresAt | role: VIEWER \| EDITOR |
+| `Traveler` | tripId, firstName, lastName, passportNum | passportNum encrypted at app layer |
+| `Document` | tripId, type, s3Key, filename, parsed | type: PASSPORT \| VISA \| TICKET \| RECEIPT \| OTHER |
+| `Passkey` | userId, credentialId, publicKey, counter, deviceType | credentialId stored as Buffer |
+
+### Calling connectDB
+
+Call `await connectDB()` at the top of every Server Action and Route Handler before using any Mongoose model. In dev, the connection is cached on `globalThis` to survive HMR.
 
 ---
 
@@ -497,7 +385,7 @@ Output style:
 Hard limits to enforce in code (not prompt):
 - Max 12 tool calls per conversation turn
 - Max 200k input tokens, 8k output tokens per request
-- Total budget: $0.30 per planning session (track in `agent_session` table)
+- Total budget: $0.30 per planning session (track in `agent_session` collection in MongoDB)
 
 ---
 
@@ -510,6 +398,7 @@ Hard limits to enforce in code (not prompt):
 - All money is `Cents: number` and `currency: string`. Never `number` for currency. Never floats.
 - All times are `Date` in TypeScript, `time.Time` in Go. Always store UTC. Display in user locale.
 - Errors return RFC 7807 Problem Details JSON
+- Always call `await connectDB()` before using Mongoose models in server context
 
 ### File naming
 - `kebab-case` for files
@@ -542,6 +431,7 @@ If you find yourself wanting to do any of these, stop and ask:
 - ❌ Auth provider lock-in (Clerk/Auth0) — Auth.js stays portable
 - ❌ Vercel-only deployment — must run on Fly.io / Hetzner too
 - ❌ ChatGPT-style open chat in the AI planner — constrain to planning task only
+- ❌ SQL databases for app data — MongoDB is the decision, do not revert to Postgres for app models
 
 ---
 
@@ -586,4 +476,4 @@ When in doubt, the architecture doc is the source of truth for *what* to build, 
 
 ---
 
-*Wanderly — Architecture & Build Plan v1.0 · For Ahmed · 2026*
+*Wanderly — Architecture & Build Plan v1.1 · For Ahmed · 2026*

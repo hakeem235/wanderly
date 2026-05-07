@@ -1,6 +1,23 @@
-version: "3.9"
-
 services:
+  mongo:
+    image: mongo:7
+    container_name: wanderly-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: wanderly
+      MONGO_INITDB_ROOT_PASSWORD: wanderly
+      MONGO_INITDB_DATABASE: wanderly
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Postgres kept for n8n only
   postgres:
     image: postgres:16-alpine
     container_name: wanderly-postgres
@@ -8,7 +25,7 @@ services:
     environment:
       POSTGRES_USER: wanderly
       POSTGRES_PASSWORD: wanderly
-      POSTGRES_DB: wanderly
+      POSTGRES_DB: n8n
     ports:
       - "5432:5432"
     volumes:
@@ -78,6 +95,7 @@ services:
         condition: service_healthy
 
 volumes:
+  mongo_data:
   postgres_data:
   redis_data:
   typesense_data:
