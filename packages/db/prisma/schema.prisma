@@ -1,0 +1,180 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  name         String?
+  locale       String        @default("en")
+  trips        Trip[]
+  bookings     Booking[]
+  subscription Subscription?
+  passkeys     Passkey[]
+  createdAt    DateTime      @default(now())
+}
+
+model Trip {
+  id          String      @id @default(cuid())
+  ownerId     String
+  owner       User        @relation(fields: [ownerId], references: [id])
+  title       String
+  destination String
+  startDate   DateTime
+  endDate     DateTime
+  status      TripStatus  @default(PLANNING)
+  budgetCents Int?
+  currency    String      @default("USD")
+  travelers   Traveler[]
+  segments    Segment[]
+  bookings    Booking[]
+  documents   Document[]
+  shares      TripShare[]
+  metadata    Json        @default("{}")
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([ownerId, startDate])
+}
+
+enum TripStatus {
+  PLANNING
+  BOOKED
+  ONGOING
+  COMPLETED
+  CANCELLED
+}
+
+model Segment {
+  id        String      @id @default(cuid())
+  tripId    String
+  trip      Trip        @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  type      SegmentType
+  startsAt  DateTime
+  endsAt    DateTime?
+  title     String
+  payload   Json
+  bookingId String?
+  booking   Booking?    @relation(fields: [bookingId], references: [id])
+  orderHint Int         @default(0)
+
+  @@index([tripId, startsAt])
+}
+
+enum SegmentType {
+  FLIGHT
+  LODGING
+  ACTIVITY
+  TRANSFER
+  FOOD
+  NOTE
+}
+
+model Booking {
+  id              String        @id @default(cuid())
+  userId          String
+  user            User          @relation(fields: [userId], references: [id])
+  tripId          String?
+  trip            Trip?         @relation(fields: [tripId], references: [id])
+  provider        String
+  providerRef     String
+  status          BookingStatus
+  totalCents      Int
+  commissionCents Int           @default(0)
+  currency        String
+  rawOffer        Json
+  stripePiId      String?       @unique
+  idempotencyKey  String        @unique
+  createdAt       DateTime      @default(now())
+  confirmedAt     DateTime?
+  segments        Segment[]
+
+  @@index([userId, createdAt])
+  @@index([provider, providerRef])
+}
+
+enum BookingStatus {
+  QUOTED
+  PENDING
+  CONFIRMED
+  CANCELLED
+  FAILED
+}
+
+model Subscription {
+  id                String    @id @default(cuid())
+  userId            String    @unique
+  user              User      @relation(fields: [userId], references: [id])
+  stripeCustomerId  String    @unique
+  stripeSubId       String?   @unique
+  plan              Plan      @default(FREE)
+  currentPeriodEnd  DateTime?
+  cancelAtPeriodEnd Boolean   @default(false)
+}
+
+enum Plan {
+  FREE
+  PRO
+  TEAM
+}
+
+model TripShare {
+  id        String    @id @default(cuid())
+  tripId    String
+  trip      Trip      @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  email     String?
+  token     String    @unique
+  role      ShareRole @default(VIEWER)
+  expiresAt DateTime?
+}
+
+enum ShareRole {
+  VIEWER
+  EDITOR
+}
+
+model Traveler {
+  id          String    @id @default(cuid())
+  tripId      String
+  trip        Trip      @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  firstName   String
+  lastName    String
+  dateOfBirth DateTime?
+  passportNum String?
+  nationality String?
+}
+
+model Document {
+  id        String   @id @default(cuid())
+  tripId    String
+  trip      Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  type      DocType
+  s3Key     String
+  filename  String
+  parsed    Json?
+  createdAt DateTime @default(now())
+}
+
+enum DocType {
+  PASSPORT
+  VISA
+  TICKET
+  RECEIPT
+  OTHER
+}
+
+model Passkey {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credentialId Bytes    @unique
+  publicKey    Bytes
+  counter      BigInt
+  deviceType   String
+  createdAt    DateTime @default(now())
+}
