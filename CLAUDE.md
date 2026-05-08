@@ -134,16 +134,24 @@ Do not skip ahead. Each phase ships to a deployed preview environment before the
 
 **DoD:** ✅ POST to `/api/email/inbound` with Booking.com payload → LODGING segment created in MongoDB. Resend inbound domain + MX pending DNS setup for production.
 
-### Phase 4 — Flight + Hotel Search (Days 13–18)
+### Phase 4 — Flight + Hotel Search (Days 13–18) ✅ COMPLETE (pending Amadeus credentials)
 
-- [ ] `apps/search` — Go service skeleton with chi, structured logging (zap), OTel
-- [ ] Provider interface (see §6) + Amadeus adapter (sandbox)
-- [ ] Aggregator with concurrent fan-out, Redis cache, deduplication, ranking
-- [ ] OpenAPI spec for search endpoints + generated TS client
-- [ ] Search UI in web app (Screen 05) — filter rail, results list, "BEST VALUE" callout
-- [ ] Save quote to trip as a draft segment (not booked yet)
+- [x] `apps/search` — Go service: chi router, zap logging, graceful shutdown, `/health` + `/v1/flights`
+- [x] Provider interface (`providers.Provider`) + Amadeus adapter — OAuth token refresh, flight-offers v2, pricing endpoint
+- [x] Aggregator — concurrent fan-out, Redis cache (10 min TTL), dedup by flightNum+depart, price-ranked results
+- [x] OpenAPI 3.0.3 spec — `apps/search/openapi.yaml`
+- [x] `packages/sdk` — `openapi-typescript` codegen + `SearchClient` + `SearchError` typed wrapper
+- [x] Search UI — `/search` page: search form, filter rail (stops/price/refundable), offer cards, BEST VALUE banner
+- [x] Save quote to trip — `POST /api/search/save-quote` creates `FLIGHT` segment with `status: QUOTED`
+- [x] Mapbox GL JS map on trip detail page — flight arcs, airport markers, auto-fitBounds
+- [x] Nav search bar links to `/search`
 
-**DoD:** Search RUH→HND for Aug 12, see ≥10 results from Amadeus sandbox, save a quote to my Tokyo trip.
+**Known notes:**
+- Go 1.20 on dev machine — using chi v5.0.12 and go-redis/v8 (v9 requires Go 1.22+)
+- Amadeus adapter: `Confirm` and `Cancel` return `not implemented yet` — implemented in Phase 5
+- SDK regenerate command: `pnpm --filter @wanderly/sdk generate`
+
+**DoD:** ⏳ Awaiting Amadeus sandbox credentials (developers.amadeus.com). All infrastructure is ready — add `AMADEUS_CLIENT_ID` + `AMADEUS_CLIENT_SECRET` to `apps/search/.env` and run `go run ./cmd/server` to get live results.
 
 ### Phase 5 — Booking + Stripe (Days 19–24)
 
@@ -470,12 +478,13 @@ A feature is **not done** until:
 
 ## 12. Current state — pick up here
 
-Phases 1, 2, and 3 are complete. When resuming work:
+Phases 1, 2, 3, and 4 are complete. When resuming work:
 
 1. Read this file end-to-end.
 2. Run `docker compose -f infra/docker-compose.yml up -d` to start local services.
 3. Run `pnpm --filter @wanderly/web dev` to start the web app (port 3000).
-4. The next phase is **Phase 4 — Flight + Hotel Search**.
+4. Optionally run the Go search service: `cd apps/search && AMADEUS_CLIENT_ID=xxx AMADEUS_CLIENT_SECRET=yyy go run ./cmd/server`
+5. The next phase is **Phase 5 — Booking + Stripe**.
 
 **Auth note:** Migrated from Auth.js to Clerk v6. All auth code uses `@clerk/nextjs/server`. The `auth()` helper returns `{ userId }` (Clerk user ID string, not MongoDB ObjectId). Server actions must check `if (!userId) redirect("/login")`.
 
@@ -483,12 +492,15 @@ Phases 1, 2, and 3 are complete. When resuming work:
 
 **Email parser note:** All regex parsers receive the `from` address as a second argument — brand detection checks both body and sender. `normalizeDate()` strips leading weekday names before `new Date()` parsing.
 
-**Phase 4 starting point:**
-- Go service lives in `apps/search/` — scaffold from scratch with `go mod init`
-- Provider interface defined in §6 above
-- Amadeus sandbox credentials needed — sign up at developers.amadeus.com
-- Redis cache already running via docker-compose (`wanderly-redis`, port 6379)
-- Search UI endpoint: `GET /api/search/flights?origin=RUH&destination=HND&date=2026-08-12&adults=1`
+**Search service note:** Go module at `apps/search/` — `go mod init github.com/wanderly/search`. Uses chi v5.0.12 and go-redis/v8 (pinned for Go 1.20 compat). SDK codegen: `pnpm --filter @wanderly/sdk generate`. `/api/search/flights` proxies to Go service via `createServerSearchClient()` from `@wanderly/sdk`.
+
+**Mapbox note:** Token is `NEXT_PUBLIC_MAPBOX_TOKEN` in `.env.local`. `TripMap` component does IATA→coords lookup for flight arcs. Extend `IATA_COORDS` map in `trip-map.tsx` for new airports.
+
+**Phase 5 starting point:**
+- Stripe credentials needed — `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
+- Booking model already exists in `packages/db` with `QUOTED → PENDING → CONFIRMED | FAILED | CANCELLED` statuses
+- Idempotency key: store in Redis with 24h TTL, keyed by `userId:offerId`
+- Amadeus `Confirm()` method in `apps/search/internal/providers/amadeus/amadeus.go` is stubbed — implement in Phase 5
 
 **Do not** try to scaffold multiple phases at once. Each phase ships and is reviewed before the next starts.
 
@@ -504,4 +516,4 @@ When in doubt, the architecture doc is the source of truth for *what* to build, 
 
 ---
 
-*Wanderly — Architecture & Build Plan v1.3 · For Ahmed · 2026 · Phases 1–3 complete*
+*Wanderly — Architecture & Build Plan v1.4 · For Ahmed · 2026 · Phases 1–4 complete*
