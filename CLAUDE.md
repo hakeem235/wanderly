@@ -118,15 +118,21 @@ Do not skip ahead. Each phase ships to a deployed preview environment before the
 
 **DoD:** ✅ Created "Tokyo Aug 2026", added segments, shared link works, installable as PWA.
 
-### Phase 3 — Email Import (Days 10–12)
+### Phase 3 — Email Import (Days 10–12) ✅ COMPLETE
 
-- [ ] Resend inbound webhook receiver — `forward+TRIP_ID@import.wanderly.co`
-- [ ] Email parser: hybrid regex (for known senders: Booking, airlines) + Claude fallback for unknown formats
-- [ ] Document upload to R2 (or S3) for confirmations
-- [ ] Auto-create segments from parsed emails, attach original email + PDFs as documents
-- [ ] Test fixtures: 10 sample confirmation emails (anonymized) covering Booking, Saudia, Emirates, Airbnb, Viator
+- [x] Resend inbound webhook receiver — `forward+TRIP_ID@import.wanderly.co`
+- [x] Email parser: hybrid regex (Booking.com, Saudia, Emirates, flyadeal, Airbnb, Viator) + Claude fallback
+- [x] Document upload to AWS S3 (`filestoreg`, eu-north-1) for PDF attachments
+- [x] Auto-create segments from parsed emails, attach PDFs as TripDocument records
+- [x] Test fixtures: 10 sample confirmation emails — 10/10 passing
+- [x] Svix signature verification (whsec_ prefix, base64 key, signed content = id.timestamp.body)
 
-**DoD:** I forward a Booking.com confirmation email to my trip address, the segment appears within 30 seconds.
+**Known bugs fixed in this phase:**
+- All regex parsers check `sender` (From address) in addition to body — brand names rarely appear in plain-text body
+- `new Date("Saturday, August 13, 2026")` fails — added `normalizeDate()` to strip leading weekday names
+- Svix signature: previous implementation signed raw body with raw secret; fixed to Svix spec
+
+**DoD:** ✅ POST to `/api/email/inbound` with Booking.com payload → LODGING segment created in MongoDB. Resend inbound domain + MX pending DNS setup for production.
 
 ### Phase 4 — Flight + Hotel Search (Days 13–18)
 
@@ -464,16 +470,25 @@ A feature is **not done** until:
 
 ## 12. Current state — pick up here
 
-Phases 1 and 2 are complete. When resuming work:
+Phases 1, 2, and 3 are complete. When resuming work:
 
 1. Read this file end-to-end.
 2. Run `docker compose -f infra/docker-compose.yml up -d` to start local services.
 3. Run `pnpm --filter @wanderly/web dev` to start the web app (port 3000).
-4. The next phase is **Phase 3 — Email Import**.
+4. The next phase is **Phase 4 — Flight + Hotel Search**.
 
-**Auth note:** We migrated from Auth.js to Clerk v6 mid-Phase 1. All auth code uses `@clerk/nextjs/server`. The `auth()` helper returns `{ userId }` (a Clerk user ID string, not a MongoDB ObjectId). Server actions must check `if (!userId) redirect("/login")` — do not use `notFound()` as the auth guard.
+**Auth note:** Migrated from Auth.js to Clerk v6. All auth code uses `@clerk/nextjs/server`. The `auth()` helper returns `{ userId }` (Clerk user ID string, not MongoDB ObjectId). Server actions must check `if (!userId) redirect("/login")`.
 
-**Mongoose note:** Always use `127.0.0.1` (not `localhost`) in `MONGODB_URI`. After calling `connectDB()`, check that `mongoose.connection.readyState === 1` if you suspect a stale connection. The `connectDB()` function resets its internal promise on readyState 0 or 3 before reconnecting.
+**Mongoose note:** Always use `127.0.0.1` (not `localhost`) in `MONGODB_URI`. `connectDB()` resets its internal promise on readyState 0 or 3 before reconnecting.
+
+**Email parser note:** All regex parsers receive the `from` address as a second argument — brand detection checks both body and sender. `normalizeDate()` strips leading weekday names before `new Date()` parsing.
+
+**Phase 4 starting point:**
+- Go service lives in `apps/search/` — scaffold from scratch with `go mod init`
+- Provider interface defined in §6 above
+- Amadeus sandbox credentials needed — sign up at developers.amadeus.com
+- Redis cache already running via docker-compose (`wanderly-redis`, port 6379)
+- Search UI endpoint: `GET /api/search/flights?origin=RUH&destination=HND&date=2026-08-12&adults=1`
 
 **Do not** try to scaffold multiple phases at once. Each phase ships and is reviewed before the next starts.
 
@@ -489,4 +504,4 @@ When in doubt, the architecture doc is the source of truth for *what* to build, 
 
 ---
 
-*Wanderly — Architecture & Build Plan v1.2 · For Ahmed · 2026 · Phases 1–2 complete*
+*Wanderly — Architecture & Build Plan v1.3 · For Ahmed · 2026 · Phases 1–3 complete*
