@@ -17,20 +17,46 @@ export interface ParsedSegment {
   confidence: "high" | "low";
 }
 
-// ── Regex parsers for known senders ──────────────────────────────────────────
+// ── Date helpers ──────────────────────────────────────────────────────────────
+
+/** Strip leading weekday name so Date() can parse "Saturday, August 13, 2026" */
+function normalizeDate(s: string): string {
+  return s.replace(/^[A-Za-z]+,\s*/, "").trim();
+}
+
+function safeDate(s: string | undefined): string | null {
+  if (!s) return null;
+  const d = new Date(normalizeDate(s));
+  return isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+// ── Regex parsers ─────────────────────────────────────────────────────────────
 
 function parseBookingCom(text: string): ParsedSegment | null {
   if (!/booking\.com/i.test(text) && !/booking confirmation/i.test(text)) return null;
-  const hotelMatch = text.match(/(?:your reservation at|staying at|property:?)\s*([^\n\r,]+)/i);
-  const checkIn = text.match(/check[- ]?in[:\s]+([A-Za-z]+ \d{1,2},? \d{4}|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i);
-  const checkOut = text.match(/check[- ]?out[:\s]+([A-Za-z]+ \d{1,2},? \d{4}|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i);
+
+  // Match hotel name — stop at "is confirmed", "!", newline, or comma
+  const hotelMatch = text.match(
+    /(?:your reservation at|staying at|property:?)\s*([^!\n\r,]+?)(?:\s+is\s+confirmed|[!\n\r,]|$)/i
+  );
+  const checkIn = text.match(
+    /check[- ]?in[:\s]+([A-Za-z]+,?\s*[A-Za-z]+\s+\d{1,2},?\s*\d{4}|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i
+  );
+  const checkOut = text.match(
+    /check[- ]?out[:\s]+([A-Za-z]+,?\s*[A-Za-z]+\s+\d{1,2},?\s*\d{4}|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i
+  );
   const confNum = text.match(/confirmation[:\s#]+([A-Z0-9-]{5,15})/i);
+
   if (!hotelMatch?.[1] || !checkIn?.[1]) return null;
+  const startsAt = safeDate(checkIn[1]);
+  if (!startsAt) return null;
+  const endsAt = safeDate(checkOut?.[1]);
+
   return {
     type: "LODGING",
     title: hotelMatch[1].trim(),
-    startsAt: new Date(checkIn[1]).toISOString(),
-    ...(checkOut?.[1] ? { endsAt: new Date(checkOut[1]).toISOString() } : {}),
+    startsAt,
+    ...(endsAt ? { endsAt } : {}),
     payload: { confirmationNumber: confNum?.[1], provider: "Booking.com" },
     confidence: "high",
   };
@@ -39,24 +65,35 @@ function parseBookingCom(text: string): ParsedSegment | null {
 function parseFlight(text: string, sender: string): ParsedSegment | null {
   const airlines = ["saudia", "saudi arabian", "sv ", "emirates", "ek ", "flyadeal", "flynas", "lufthansa", "turkish airlines"];
   const isFlight =
-    /flight confirmation|boarding pass|e-ticket|itinerary receipt/i.test(text) ||
+    /flight\s+confirm|boarding\s+pass|e-?ticket|itinerary\s+receipt/i.test(text) ||
     airlines.some((a) => text.toLowerCase().includes(a));
   if (!isFlight) return null;
 
-  const flightNum = text.match(/\b([A-Z]{1,2}\s?\d{1,4})\b/);
-  const route = text.match(/([A-Z]{3})\s*(?:→|->|to)\s*([A-Z]{3})/);
-  const depDate = text.match(/(?:departure|departs?|flight date)[:\s]+([A-Za-z]+ \d{1,2},? \d{4}|\d{1,2} [A-Za-z]+ \d{4})/i);
-  const depTime = text.match(/(?:departure time|departs?)[:\s]+(\d{1,2}:\d{2}\s*(?:AM|PM)?)/i);
-  const pnr = text.match(/\b(?:PNR|booking ref(?:erence)?|reservation)[:\s#]*([A-Z0-9]{5,7})\b/i);
+  const flightNum = text.match(/\b([A-Z]{1,2})\s?(\d{2,4})\b/);
+  const route = text.match(/\b([A-Z]{3})\s*(?:[\u2192\u2014\-]|->|to)\s*([A-Z]{3})\b/);
+
+  // "Departure date: Aug 12, 2026" OR "Departure: Aug 12, 2026"
+  const depDate = text.match(
+    /(?:departure\s+date|departure|departs?|flight\s+date)\s*:\s*([A-Za-z]+,?\s*[A-Za-z]*\s+\d{1,2},?\s*\d{4}|\d{1,2}\s+[A-Za-z]+\s+\d{4})/i
+  );
+  const depTime = text.match(/(?:departure\s+time|departs?)\s*:\s*(\d{1,2}:\d{2}\s*(?:AM|PM)?)/i);
+  const pnr = text.match(/\b(?:PNR|booking\s+ref(?:erence)?|reservation)\s*[:\s#]*([A-Z0-9]{5,7})\b/i);
 
   if (!depDate?.[1]) return null;
-  const startsAt = new Date(`${depDate[1]} ${depTime?.[1] ?? "00:00"}`).toISOString();
-  const flightLabel = flightNum?.[1];
-  const routeLabel = route ? `${route[1]}→${route[2]}` : undefined;
+  const startsAt = safeDate(`${depDate[1]} ${depTime?.[1] ?? "00:00"}`);
+  if (!startsAt) return null;
+
+  const flightLabel = flightNum ? `${flightNum[1]}${flightNum[2]}` : undefined;
+  const routeLabel = route ? `${route[1]}\u2192${route[2]}` : undefined;
 
   return {
     type: "FLIGHT",
-    title: [flightLabel ? `Flight ${flightLabel}` : "Flight", routeLabel].filter(Boolean).join(" · "),
+    title: [
+      flightLabel ? `Flight ${flightLabel}` : "Flight",
+      routeLabel,
+    ]
+      .filter(Boolean)
+      .join(" \u00b7 "),
     startsAt,
     payload: {
       flightNumber: flightLabel,
@@ -69,18 +106,30 @@ function parseFlight(text: string, sender: string): ParsedSegment | null {
   };
 }
 
-function parseAirbnb(text: string): ParsedSegment | null {
-  if (!/airbnb/i.test(text)) return null;
-  const propMatch = text.match(/(?:you're going to|staying at|your reservation at)\s+(.+?)(?:\n|,)/i);
-  const checkIn = text.match(/check-in[:\s]+([A-Za-z]+,? [A-Za-z]+ \d{1,2},? \d{4})/i);
-  const checkOut = text.match(/check-out[:\s]+([A-Za-z]+,? [A-Za-z]+ \d{1,2},? \d{4})/i);
-  const confCode = text.match(/confirmation code[:\s]+([A-Z0-9]+)/i);
+function parseAirbnb(text: string, sender: string): ParsedSegment | null {
+  if (!/airbnb/i.test(text) && !/airbnb/i.test(sender)) return null;
+
+  const propMatch = text.match(
+    /(?:you'?re going to|staying at|your reservation at)\s+(.+?)(?:\n|,\s*[A-Z])/i
+  );
+  const checkIn = text.match(
+    /check-?in\s*[:\-]\s*([A-Za-z]+,?\s*[A-Za-z]+\s+\d{1,2},?\s*\d{4})/i
+  );
+  const checkOut = text.match(
+    /check-?out\s*[:\-]\s*([A-Za-z]+,?\s*[A-Za-z]+\s+\d{1,2},?\s*\d{4})/i
+  );
+  const confCode = text.match(/confirmation\s+code\s*[:\-]\s*([A-Z0-9]+)/i);
+
   if (!checkIn?.[1]) return null;
+  const startsAt = safeDate(checkIn[1]);
+  if (!startsAt) return null;
+  const endsAt = safeDate(checkOut?.[1]);
+
   return {
     type: "LODGING",
     title: propMatch?.[1]?.trim() ?? "Airbnb stay",
-    startsAt: new Date(checkIn[1]).toISOString(),
-    ...(checkOut?.[1] ? { endsAt: new Date(checkOut[1]).toISOString() } : {}),
+    startsAt,
+    ...(endsAt ? { endsAt } : {}),
     payload: { confirmationCode: confCode?.[1], provider: "Airbnb" },
     confidence: "high",
   };
@@ -88,14 +137,23 @@ function parseAirbnb(text: string): ParsedSegment | null {
 
 function parseViator(text: string): ParsedSegment | null {
   if (!/viator/i.test(text)) return null;
-  const tourMatch = text.match(/(?:activity|tour|experience)[:\s]+(.+?)(?:\n)/i);
-  const dateMatch = text.match(/(?:^date|activity date)[:\s]+([A-Za-z]+ \d{1,2},? \d{4})/im);
-  const bookingRef = text.match(/booking ref(?:erence)?[:\s#]+([A-Z0-9-]+)/i);
+
+  // Title from subject line (more reliable than body)
+  const subjectMatch = text.match(/booking\s+confirmed?\s*[–\-]\s*(.+?)(?:\n|$)/i);
+  const bodyActivity = text.match(/(?:^activity|^tour|^experience)\s*:\s*(.+?)(?:\n|$)/im);
+  const dateMatch = text.match(
+    /(?:^date|activity\s+date)\s*:\s*([A-Za-z]+,?\s*[A-Za-z]+\s+\d{1,2},?\s*\d{4})/im
+  );
+  const bookingRef = text.match(/booking\s+ref(?:erence)?\s*[:\-]\s*([A-Z0-9-]+)/i);
+
   if (!dateMatch?.[1]) return null;
+  const startsAt = safeDate(dateMatch[1]);
+  if (!startsAt) return null;
+
   return {
     type: "ACTIVITY",
-    title: tourMatch?.[1]?.trim() ?? "Viator activity",
-    startsAt: new Date(dateMatch[1]).toISOString(),
+    title: (subjectMatch?.[1] ?? bodyActivity?.[1] ?? "Viator activity").trim(),
+    startsAt,
     payload: { bookingRef: bookingRef?.[1], provider: "Viator" },
     confidence: "high",
   };
@@ -176,7 +234,7 @@ export async function parseEmail(opts: {
   const result =
     parseBookingCom(combined) ??
     parseFlight(combined, from) ??
-    parseAirbnb(combined) ??
+    parseAirbnb(combined, from) ??
     parseViator(combined);
 
   if (result) return result;
