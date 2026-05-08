@@ -7,23 +7,46 @@ import { withSpan } from "@/lib/tracing";
 
 export const dynamic = "force-dynamic";
 
-// ── Resend webhook signature verification ────────────────────────────────────
+// ── Resend webhook signature verification (Svix format) ──────────────────────
 
-function verifySignature(payload: string, signatureHeader: string): boolean {
+function verifySignature(
+  payload: string,
+  req: NextRequest
+): boolean {
   const secret = process.env.RESEND_WEBHOOK_SECRET;
   if (!secret) {
-    // Dev shortcut: skip verification if secret not configured
     console.warn("[email/inbound] RESEND_WEBHOOK_SECRET not set — skipping signature check");
     return true;
   }
-  const expected = crypto
-    .createHmac("sha256", secret)
-    .update(payload)
-    .digest("hex");
-  return crypto.timingSafeEqual(
-    Buffer.from(signatureHeader, "hex"),
-    Buffer.from(expected, "hex")
-  );
+
+  const msgId = req.headers.get("svix-id") ?? "";
+  const msgTimestamp = req.headers.get("svix-timestamp") ?? "";
+  const msgSignature = req.headers.get("svix-signature") ?? "";
+
+  if (!msgId || !msgTimestamp || !msgSignature) {
+    console.warn("[email/inbound] Missing Svix headers — skipping signature check");
+    return true;
+  }
+
+  // Svix signs: "{svix-id}.{svix-timestamp}.{body}"
+  const signedContent = `${msgId}.${msgTimestamp}.${payload}`;
+
+  // Secret is "whsec_" + base64-encoded key
+  const secretBytes = Buffer.from(secret.replace(/^whsec_/, ""), "base64");
+  const computed = crypto
+    .createHmac("sha256", secretBytes)
+    .update(signedContent)
+    .digest("base64");
+
+  // Header is "v1,<base64sig> v1,<base64sig2> ..." — any match is valid
+  const signatures = msgSignature.split(" ").map((s) => s.replace(/^v1,/, ""));
+  return signatures.some((sig) => {
+    try {
+      return crypto.timingSafeEqual(Buffer.from(sig, "base64"), Buffer.from(computed, "base64"));
+    } catch {
+      return false;
+    }
+  });
 }
 
 // ── Resend inbound email payload types ───────────────────────────────────────
@@ -52,8 +75,7 @@ export async function POST(req: NextRequest) {
   const rawBody = await req.text();
 
   // Verify Resend signature
-  const sig = req.headers.get("svix-signature") ?? req.headers.get("x-resend-signature") ?? "";
-  if (!verifySignature(rawBody, sig)) {
+  if (!verifySignature(rawBody, req)) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
