@@ -155,7 +155,15 @@ export function FlightOfferCard({ offer, trips, onSaved }: FlightOfferCardProps)
           </div>
 
           {saved ? (
-            <span className="font-mono text-[10px] uppercase tracking-badge text-teal">Saved ✓</span>
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-[10px] uppercase tracking-badge text-teal">Saved ✓</span>
+              <a
+                href={`/checkout?tripId=${selectedTrip}&offer=${encodeURIComponent(JSON.stringify(offer))}`}
+                className="px-4 py-1.5 bg-terracotta hover:bg-terracotta-deep text-paper text-xs font-medium rounded-lg transition-colors"
+              >
+                Book now →
+              </a>
+            </div>
           ) : (
             <div className="flex items-center gap-2">
               {trips.length > 1 && (
