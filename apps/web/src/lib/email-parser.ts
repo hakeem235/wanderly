@@ -32,8 +32,8 @@ function safeDate(s: string | undefined): string | null {
 
 // ── Regex parsers ─────────────────────────────────────────────────────────────
 
-function parseBookingCom(text: string): ParsedSegment | null {
-  if (!/booking\.com/i.test(text) && !/booking confirmation/i.test(text)) return null;
+function parseBookingCom(text: string, sender: string): ParsedSegment | null {
+  if (!/booking\.com/i.test(text) && !/booking\.com/i.test(sender) && !/booking confirmation/i.test(text)) return null;
 
   // Match hotel name — stop at "is confirmed", "!", newline, or comma
   const hotelMatch = text.match(
@@ -135,8 +135,8 @@ function parseAirbnb(text: string, sender: string): ParsedSegment | null {
   };
 }
 
-function parseViator(text: string): ParsedSegment | null {
-  if (!/viator/i.test(text)) return null;
+function parseViator(text: string, sender: string): ParsedSegment | null {
+  if (!/viator/i.test(text) && !/viator/i.test(sender)) return null;
 
   // Title from subject line (more reliable than body)
   const subjectMatch = text.match(/booking\s+confirmed?\s*[–\-]\s*(.+?)(?:\n|$)/i);
@@ -232,10 +232,10 @@ export async function parseEmail(opts: {
   const combined = `${subject}\n${textBody}`;
 
   const result =
-    parseBookingCom(combined) ??
+    parseBookingCom(combined, from) ??
     parseFlight(combined, from) ??
     parseAirbnb(combined, from) ??
-    parseViator(combined);
+    parseViator(combined, from);
 
   if (result) return result;
 
