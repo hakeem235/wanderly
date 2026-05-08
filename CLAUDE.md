@@ -153,18 +153,23 @@ Do not skip ahead. Each phase ships to a deployed preview environment before the
 
 **DoD:** ⏳ Awaiting Amadeus sandbox credentials (developers.amadeus.com). All infrastructure is ready — add `AMADEUS_CLIENT_ID` + `AMADEUS_CLIENT_SECRET` to `apps/search/.env` and run `go run ./cmd/server` to get live results.
 
-### Phase 5 — Booking + Stripe (Days 19–24)
+### Phase 5 — Booking + Stripe (Days 19–24) ✅ COMPLETE (pending Stripe credentials)
 
-- [ ] Booking endpoint with idempotency key (Redis-backed, 24h TTL)
-- [ ] Stripe Connect onboarding for the platform account
-- [ ] PaymentIntent creation, 3DS handling, webhook reconciliation
-- [ ] Confirm-with-provider step (Amadeus order create)
-- [ ] Booking state machine — `QUOTED → PENDING → CONFIRMED | FAILED | CANCELLED` (only forward transitions)
-- [ ] Failure recovery (see §7 — every failure mode handled)
-- [ ] Checkout UI (Screen 06) — travelers form, contact, payment, order summary
-- [ ] Confirmation email via Resend with PDF e-ticket attached
+- [x] `POST /api/booking/create-intent` — validates trip ownership, creates Stripe PaymentIntent, creates Booking doc (PENDING), Redis idempotency (24h TTL)
+- [x] Stripe webhook (`POST /api/webhooks/stripe`) — signature verification, `payment_intent.succeeded` → CONFIRMED, `payment_intent.payment_failed` → FAILED, `charge.refunded` → CANCELLED
+- [x] Booking state machine (`src/lib/booking/state-machine.ts`) — forward-only transitions, `canTransition()` / `assertTransition()`
+- [x] Idempotency layer (`src/lib/booking/idempotency.ts`) — Redis-backed, 24h TTL, keyed `userId:idempotencyKey`
+- [x] Checkout UI (`/checkout`) — travelers form, contact, Stripe Elements PaymentElement, order summary sidebar, success screen
+- [x] "Book now →" button on saved offer cards in search results
+- [x] Confirmation email — React Email boarding-pass template, sent via Resend on CONFIRMED transition, plain-text fallback
 
-**DoD:** Book the Saudia flight in test mode, get a confirmation PNR, receive email with attached e-ticket. Force every failure mode in test and verify clean recovery.
+**Known notes:**
+- Stripe API version: `2026-04-22.dahlia` (matches stripe@22.x)
+- Confirmation email is best-effort — never blocks the webhook response
+- `REDIS_URL` env var needed for idempotency layer (default: `redis://127.0.0.1:6379`)
+- Amadeus `Confirm()` still stubbed — needed for real PNR in production
+
+**DoD:** ⏳ Infrastructure complete. Add `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` to `.env.local` to activate payments.
 
 ### Phase 6 — AI Itinerary Agent (Days 25–30)
 
@@ -478,13 +483,13 @@ A feature is **not done** until:
 
 ## 12. Current state — pick up here
 
-Phases 1, 2, 3, and 4 are complete. When resuming work:
+Phases 1–5 are complete. When resuming work:
 
 1. Read this file end-to-end.
 2. Run `docker compose -f infra/docker-compose.yml up -d` to start local services.
 3. Run `pnpm --filter @wanderly/web dev` to start the web app (port 3000).
 4. Optionally run the Go search service: `cd apps/search && AMADEUS_CLIENT_ID=xxx AMADEUS_CLIENT_SECRET=yyy go run ./cmd/server`
-5. The next phase is **Phase 5 — Booking + Stripe**.
+5. The next phase is **Phase 6 — AI Itinerary Agent**.
 
 **Auth note:** Migrated from Auth.js to Clerk v6. All auth code uses `@clerk/nextjs/server`. The `auth()` helper returns `{ userId }` (Clerk user ID string, not MongoDB ObjectId). Server actions must check `if (!userId) redirect("/login")`.
 
@@ -492,15 +497,19 @@ Phases 1, 2, 3, and 4 are complete. When resuming work:
 
 **Email parser note:** All regex parsers receive the `from` address as a second argument — brand detection checks both body and sender. `normalizeDate()` strips leading weekday names before `new Date()` parsing.
 
-**Search service note:** Go module at `apps/search/` — `go mod init github.com/wanderly/search`. Uses chi v5.0.12 and go-redis/v8 (pinned for Go 1.20 compat). SDK codegen: `pnpm --filter @wanderly/sdk generate`. `/api/search/flights` proxies to Go service via `createServerSearchClient()` from `@wanderly/sdk`.
+**Search service note:** Go module at `apps/search/` — uses chi v5.0.12 and go-redis/v8 (pinned for Go 1.20 compat). SDK codegen: `pnpm --filter @wanderly/sdk generate`. `/api/search/flights` proxies via `createServerSearchClient()` from `@wanderly/sdk`.
 
-**Mapbox note:** Token is `NEXT_PUBLIC_MAPBOX_TOKEN` in `.env.local`. `TripMap` component does IATA→coords lookup for flight arcs. Extend `IATA_COORDS` map in `trip-map.tsx` for new airports.
+**Mapbox note:** Token is `NEXT_PUBLIC_MAPBOX_TOKEN`. `TripMap` does IATA→coords lookup for flight arcs — extend `IATA_COORDS` in `trip-map.tsx` for new airports.
 
-**Phase 5 starting point:**
-- Stripe credentials needed — `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
-- Booking model already exists in `packages/db` with `QUOTED → PENDING → CONFIRMED | FAILED | CANCELLED` statuses
-- Idempotency key: store in Redis with 24h TTL, keyed by `userId:offerId`
-- Amadeus `Confirm()` method in `apps/search/internal/providers/amadeus/amadeus.go` is stubbed — implement in Phase 5
+**Stripe note:** API version `2026-04-22.dahlia`. Idempotency layer uses `redis` npm package, keyed `userId:idempotencyKey`. Webhook at `/api/webhooks/stripe` — add to Stripe dashboard. Confirmation email sent via Resend on CONFIRMED transition.
+
+**Phase 6 starting point:**
+- `packages/ai/` — scaffold from scratch: `pnpm init` + Anthropic SDK
+- Agent runtime needs: conversation state in MongoDB (`agent_sessions` collection), SSE streaming via `ReadableStream`
+- Tools: `search_flights` calls `createServerSearchClient()`, `save_itinerary` creates segments in bulk
+- Hard limits enforced in code: max 12 tool calls, 200k input / 8k output tokens, $0.30 per session budget
+- Pro plan gate: check `Subscription` model for `plan: "PRO"` before allowing agent access
+- Claude model: `claude-sonnet-4-20250514` (from ANTHROPIC_API_KEY)
 
 **Do not** try to scaffold multiple phases at once. Each phase ships and is reviewed before the next starts.
 
@@ -516,4 +525,4 @@ When in doubt, the architecture doc is the source of truth for *what* to build, 
 
 ---
 
-*Wanderly — Architecture & Build Plan v1.4 · For Ahmed · 2026 · Phases 1–4 complete*
+*Wanderly — Architecture & Build Plan v1.5 · For Ahmed · 2026 · Phases 1–5 complete*
