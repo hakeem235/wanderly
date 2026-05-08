@@ -1,0 +1,218 @@
+openapi: "3.0.3"
+info:
+  title: Wanderly Search Service
+  description: Flight search aggregator — fans out to multiple providers, caches results, returns ranked offers.
+  version: "1.0.0"
+
+servers:
+  - url: http://localhost:8080
+    description: Local dev
+  - url: https://search.wanderly.co
+    description: Production
+
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: Health check
+      tags: [meta]
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /v1/flights:
+    get:
+      operationId: searchFlights
+      summary: Search flights across providers
+      description: |
+        Fans out concurrently to all configured providers (currently Amadeus).
+        Results are deduplicated by flight number + departure time, ranked by
+        price ascending, and cached in Redis for 10 minutes.
+      tags: [flights]
+      parameters:
+        - name: origin
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 3
+            maxLength: 3
+            example: RUH
+          description: Departure airport IATA code
+        - name: destination
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 3
+            maxLength: 3
+            example: HND
+          description: Arrival airport IATA code
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+            example: "2026-08-12"
+          description: Departure date (YYYY-MM-DD)
+        - name: adults
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 9
+            default: 1
+        - name: cabin
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [economy, premium, business, first]
+            default: economy
+        - name: returnDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+            example: "2026-08-20"
+          description: Return date for round trips (omit for one-way)
+      responses:
+        "200":
+          description: List of ranked flight offers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlightSearchResponse"
+        "400":
+          description: Missing or invalid parameters
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "502":
+          description: Provider error
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "503":
+          description: Search service unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required: [ok, service]
+      properties:
+        ok:
+          type: boolean
+          example: true
+        service:
+          type: string
+          example: wanderly-search
+
+    ProblemDetails:
+      type: object
+      description: RFC 7807 Problem Details
+      required: [status, title]
+      properties:
+        status:
+          type: integer
+          example: 400
+        title:
+          type: string
+          example: Missing parameters
+        detail:
+          type: string
+          example: "origin, destination, and date are required"
+
+    FlightSlice:
+      type: object
+      required: [origin, destination, depart, arrive, carrier, flightNum, duration, stops]
+      properties:
+        origin:
+          type: string
+          example: RUH
+        destination:
+          type: string
+          example: HND
+        depart:
+          type: string
+          format: date-time
+          example: "2026-08-12T18:40:00Z"
+        arrive:
+          type: string
+          format: date-time
+          example: "2026-08-13T09:55:00Z"
+        carrier:
+          type: string
+          example: SV
+        flightNum:
+          type: string
+          example: SV802
+        duration:
+          type: integer
+          description: Flight duration in minutes
+          example: 795
+        stops:
+          type: integer
+          description: Number of stops on this leg
+          example: 0
+
+    FlightOffer:
+      type: object
+      required: [id, provider, totalCents, currency, slices, refundable, bestValue, expiresAt]
+      properties:
+        id:
+          type: string
+          description: Provider-assigned offer ID — required for QuoteOffer and Confirm calls
+          example: "1"
+        provider:
+          type: string
+          example: amadeus
+        totalCents:
+          type: integer
+          description: Total price in the smallest currency unit (cents for USD/SAR)
+          example: 145600
+        currency:
+          type: string
+          example: USD
+        slices:
+          type: array
+          items:
+            $ref: "#/components/schemas/FlightSlice"
+        refundable:
+          type: boolean
+          example: false
+        bestValue:
+          type: boolean
+          description: True for the cheapest offer in the result set
+          example: true
+        expiresAt:
+          type: string
+          format: date-time
+          description: Offer expiry — must re-quote after this time before confirming
+          example: "2026-08-12T19:10:00Z"
+
+    FlightSearchResponse:
+      type: object
+      required: [data, count]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/FlightOffer"
+        count:
+          type: integer
+          example: 12

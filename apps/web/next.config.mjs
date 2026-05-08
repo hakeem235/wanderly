@@ -5,7 +5,7 @@ const nextConfig = {
     typedRoutes: false,
     instrumentationHook: true,
   },
-  transpilePackages: ["@wanderly/ui", "@wanderly/db"],
+  transpilePackages: ["@wanderly/ui", "@wanderly/db", "@wanderly/sdk"],
   webpack(config) {
     // aws4 is an optional MongoDB peer dep (AWS auth) — not needed in app
     config.resolve.fallback = { ...config.resolve.fallback, aws4: false };
