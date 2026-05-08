@@ -12,30 +12,18 @@ export async function AppNav() {
           </span>
         </Link>
 
-        {/* Search bar placeholder */}
-        <div className="hidden md:flex items-center gap-2 flex-1 max-w-md mx-8">
-          <div className="relative w-full">
+        {/* Search shortcut */}
+        <div className="hidden md:flex items-center flex-1 max-w-md mx-8">
+          <Link href="/search" className="relative w-full group">
             <div className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
-              <svg
-                className="h-4 w-4 text-ink-mute"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
+              <svg className="h-4 w-4 text-ink-mute" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </div>
-            <input
-              type="search"
-              placeholder="Search destinations, trips..."
-              className="w-full rounded-lg border border-line bg-paper py-2 pl-9 pr-4 text-sm text-ink placeholder:text-ink-mute/60 focus:outline-none focus:ring-2 focus:ring-terracotta focus:border-transparent transition-all"
-            />
-          </div>
+            <div className="w-full rounded-lg border border-line bg-paper py-2 pl-9 pr-4 text-sm text-ink-mute/60 group-hover:border-terracotta/40 transition-colors">
+              Search flights…
+            </div>
+          </Link>
         </div>
 
         {/* Right side */}
