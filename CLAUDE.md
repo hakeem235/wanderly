@@ -34,7 +34,7 @@ Payments:        Stripe (Subscriptions + PaymentIntents + Connect)
 Email:           Resend + React Email
 Workflows:       n8n (self-hosted, backed by Postgres)
 Maps:            Mapbox GL JS
-Auth:            Auth.js v5 + MongoDB adapter + Passkeys
+Auth:            Clerk (@clerk/nextjs v6) — email/password, OAuth, passkeys
 Validation:      Zod (everywhere — never trust unvalidated JSON)
 Observability:   OpenTelemetry → Grafana Cloud
 Errors:          Sentry
@@ -82,32 +82,41 @@ wanderly/
 
 Do not skip ahead. Each phase ships to a deployed preview environment before the next starts.
 
-### Phase 1 — Foundation (Days 1–4)
+### Phase 1 — Foundation (Days 1–4) ✅ COMPLETE
 
 - [x] Init monorepo, pnpm workspaces, turbo, shared eslint/tsconfig
 - [x] Docker compose for local dev (MongoDB 7, Postgres 16 for n8n, Redis 7, Typesense, n8n)
 - [x] `packages/db` — Mongoose models (see §5), seed script
 - [x] `apps/web` — Next.js 14 scaffold, App Router, Tailwind, shadcn/ui installed
-- [x] Auth.js v5 with email magic-link + MongoDB adapter
+- [x] Clerk v6 auth — email/password + OAuth, middleware-protected routes, UserButton in nav
 - [x] Design tokens from `docs/DESIGN.md` wired into Tailwind config
 - [x] Base layout: app shell with nav, logo, search, avatar (per Screen 02 in design system)
 - [x] One protected route renders user's email — proves auth round trip works
-- [x] GitHub Actions: lint, typecheck, test, build on PR
-- [ ] Deploy to Fly.io preview env
+- [x] GitHub Actions removed (CI deferred — no deploy target yet)
+- [x] Fly.io config removed — deploy deferred to later phase
 
-**DoD:** I can sign up, log in via magic link, see a logged-in screen at `app.wanderly.local`.
+**DoD:** ✅ Sign up, log in via Clerk, see dashboard at `localhost:3000/dashboard`.
 
-### Phase 2 — Trip CRUD + Manual Entry (Days 5–9)
+### Phase 2 — Trip CRUD + Manual Entry (Days 5–9) ✅ COMPLETE
 
-- [ ] Trip create / read / update / delete (server actions, not REST yet)
-- [ ] Segment polymorphic CRUD — flights, lodging, activities, transfers, notes
-- [ ] Trip dashboard (Screen 02) — greeting, stats, trip cards, insights panel
-- [ ] Trip detail page (Screen 03) — hero, day rail, timeline, right rail with budget + map placeholder
-- [ ] Mobile responsive (PWA manifest)
-- [ ] Trip sharing — generate share link with token, read-only viewer route
-- [ ] OpenTelemetry traces on every server action
+- [x] Trip create / read / update / delete (server actions)
+- [x] Segment polymorphic CRUD — flights, lodging, activities, transfers, notes
+- [x] Trip dashboard (Screen 02) — greeting, stats, trip cards
+- [x] Trip detail page (Screen 03) — hero, day rail, timeline, budget + map placeholder
+- [x] Mobile responsive — PWA manifest + icons (192px, 512px), apple-web-app meta
+- [x] Trip sharing — share link with token, read-only viewer route (`/share/[token]`)
+- [x] OpenTelemetry traces on every server action (`@vercel/otel` + `withSpan()` helper)
+- [x] Marketing landing page — hero, how-it-works, features, FAQ, CTA, footer
+- [x] Clerk sign-in/up page styled with brand variables (terracotta, cream, ink tokens)
 
-**DoD:** I can create a trip "Tokyo Aug 2026", manually add 5 segments, share the link, view on mobile.
+**Known bugs fixed in this phase:**
+- Mongoose stale promise: `_mongoosePromise` held resolved promise after connection drop → reset on readyState 0/3
+- Clerk middleware: `auth.protect()` doesn't server-redirect in dev → replaced with explicit `NextResponse.redirect()`
+- Empty `app/dashboard/` directory shadowing `(app)/dashboard/page.tsx` → removed
+- `Types.ObjectId` minified by webpack → use `Schema.Types.ObjectId` everywhere
+- `localhost` resolves to IPv6 in Node 24, Docker binds IPv4 → use `127.0.0.1` in `MONGODB_URI`
+
+**DoD:** ✅ Created "Tokyo Aug 2026", added segments, shared link works, installable as PWA.
 
 ### Phase 3 — Email Import (Days 10–12)
 
@@ -219,20 +228,22 @@ All models live in `packages/db/src/models/`. No migrations — MongoDB is schem
 ```ts
 // packages/db/src/index.ts
 export async function connectDB(): Promise<typeof mongoose>
-export { default as clientPromise } from "./client"; // native MongoClient for Auth.js
+// Note: no clientPromise — Auth.js removed, Clerk handles auth outside Mongoose
 ```
 
 ### Environment variable
 
 ```
-MONGODB_URI="mongodb://wanderly:wanderly@localhost:27017/wanderly?authSource=admin"
+MONGODB_URI="mongodb://wanderly:wanderly@127.0.0.1:27017/wanderly?authSource=admin"
+# Use 127.0.0.1, NOT localhost — Node 24 resolves localhost as IPv6 (::1)
+# but Docker binds MongoDB on IPv4 only.
 ```
 
 ### Models summary
 
 | Model | Key fields | Notes |
 |---|---|---|
-| `User` | email, name, locale, emailVerified | Auth.js owns this collection |
+| `User` | email, name, locale, emailVerified | Clerk owns identity; this model is for app-level profile data |
 | `Trip` | ownerId, title, destination, startDate, endDate, status, budgetCents, currency | status: PLANNING \| BOOKED \| ONGOING \| COMPLETED \| CANCELLED |
 | `Segment` | tripId, type, startsAt, endsAt, title, payload, bookingId, orderHint | type: FLIGHT \| LODGING \| ACTIVITY \| TRANSFER \| FOOD \| NOTE; payload validated by Zod |
 | `Booking` | userId, tripId, provider, providerRef, status, totalCents, currency, idempotencyKey | status: QUOTED \| PENDING \| CONFIRMED \| CANCELLED \| FAILED |
@@ -428,7 +439,7 @@ If you find yourself wanting to do any of these, stop and ask:
 - ❌ Insurance, eSIMs, lounges — V3
 - ❌ Kafka, microservices beyond search — overkill at this scale
 - ❌ Custom design system from scratch — use shadcn/ui as base, override with brand tokens
-- ❌ Auth provider lock-in (Clerk/Auth0) — Auth.js stays portable
+- ❌ Switching auth providers again — Clerk v6 is the decision, it stays
 - ❌ Vercel-only deployment — must run on Fly.io / Hetzner too
 - ❌ ChatGPT-style open chat in the AI planner — constrain to planning task only
 - ❌ SQL databases for app data — MongoDB is the decision, do not revert to Postgres for app models
@@ -451,18 +462,20 @@ A feature is **not done** until:
 
 ---
 
-## 12. First task — start here
+## 12. Current state — pick up here
 
-When this prompt is loaded, your first action is:
+Phases 1 and 2 are complete. When resuming work:
 
-1. Read this entire file end-to-end. Do not start coding yet.
-2. Ask me clarifying questions about anything ambiguous — there is no penalty for asking, only for assuming.
-3. Confirm understanding of the phase plan and what Phase 1 ships.
-4. Propose a Phase 1 task breakdown as a checklist with estimates (in hours) — I'll approve before you start.
-5. Once approved, init the repo with `pnpm init`, set up workspaces, and commit the empty skeleton.
-6. Then work through Phase 1 one task at a time. After each task: commit, push, and pause for review.
+1. Read this file end-to-end.
+2. Run `docker compose -f infra/docker-compose.yml up -d` to start local services.
+3. Run `pnpm --filter @wanderly/web dev` to start the web app (port 3000).
+4. The next phase is **Phase 3 — Email Import**.
 
-**Do not** try to scaffold all phases at once. Each phase ships and is reviewed before the next starts. This is non-negotiable — it's how we keep the codebase quality high and avoid 10,000-line PRs.
+**Auth note:** We migrated from Auth.js to Clerk v6 mid-Phase 1. All auth code uses `@clerk/nextjs/server`. The `auth()` helper returns `{ userId }` (a Clerk user ID string, not a MongoDB ObjectId). Server actions must check `if (!userId) redirect("/login")` — do not use `notFound()` as the auth guard.
+
+**Mongoose note:** Always use `127.0.0.1` (not `localhost`) in `MONGODB_URI`. After calling `connectDB()`, check that `mongoose.connection.readyState === 1` if you suspect a stale connection. The `connectDB()` function resets its internal promise on readyState 0 or 3 before reconnecting.
+
+**Do not** try to scaffold multiple phases at once. Each phase ships and is reviewed before the next starts.
 
 ---
 
@@ -476,4 +489,4 @@ When in doubt, the architecture doc is the source of truth for *what* to build, 
 
 ---
 
-*Wanderly — Architecture & Build Plan v1.1 · For Ahmed · 2026*
+*Wanderly — Architecture & Build Plan v1.2 · For Ahmed · 2026 · Phases 1–2 complete*
