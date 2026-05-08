@@ -6,6 +6,7 @@ import { SegmentItem, type SegmentData } from "@/components/trips/segment-item";
 import { AddSegmentDialog } from "@/components/trips/add-segment-dialog";
 import { ShareButton } from "@/components/trips/share-button";
 import { DeleteTripButton } from "@/components/trips/delete-trip-button";
+import { TripMap } from "@/components/trips/trip-map";
 
 const STATUS_LABELS: Record<string, string> = {
   PLANNING: "Planning", BOOKED: "Booked", ONGOING: "Ongoing",
@@ -192,10 +193,8 @@ export default async function TripDetailPage({ params }: { params: { id: string 
             <DeleteTripButton tripId={tripData.id} />
           </div>
 
-          {/* Map placeholder */}
-          <div className="rounded-xl border border-line bg-paper-deep h-40 flex items-center justify-center">
-            <p className="text-xs text-ink-mute font-mono">Map — Phase 4</p>
-          </div>
+          {/* Map */}
+          <TripMap segments={segments} destination={tripData.destination} />
         </aside>
       </div>
     </div>
