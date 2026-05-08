@@ -1,0 +1,82 @@
+[
+  {
+    "id": "booking-hotel-dubai",
+    "from": "noreply@booking.com",
+    "subject": "Booking confirmation \u2013 Atlantis The Palm, Dubai",
+    "text": "Booking confirmation\nYour reservation at Atlantis The Palm is confirmed!\nConfirmation: BK-928374\n\nCheck-in: December 15, 2026\nCheck-out: December 20, 2026\nGuests: 2 adults\n\nTotal: AED 4,500\n",
+    "expectedType": "LODGING",
+    "expectedTitle": "Atlantis The Palm"
+  },
+  {
+    "id": "saudia-flight-ruh-hnd",
+    "from": "noreply@saudia.com",
+    "subject": "E-Ticket Itinerary \u2013 SV 802 Riyadh to Tokyo",
+    "text": "E-Ticket Itinerary Receipt\nSaudi Arabian Airlines\n\nPassenger: Ahmed Al-Hakeem\nPNR: XKTP82\n\nFlight SV 802\nRUH \u2192 HND\nDeparture date: August 12, 2026\nDeparture time: 21:40\nArrival: August 13, 2026 13:55\n\nBooking reference: XKTP82\nClass: Economy\n",
+    "expectedType": "FLIGHT",
+    "expectedTitle": "Flight SV 802 \u00b7 RUH\u2192HND"
+  },
+  {
+    "id": "emirates-flight-dxb-lhr",
+    "from": "dnr@emirates.com",
+    "subject": "Your Emirates booking confirmation EK 003",
+    "text": "Emirates E-ticket\nFlight confirmation\n\nEK 003 Dubai to London Heathrow\nPNR: MLQP34\n\nDeparture date: November 5, 2026\nDeparture time: 08:25\nDXB \u2192 LHR\n\nPassenger: Ahmed Al-Hakeem\nClass: Economy\nBaggage: 30kg included\n",
+    "expectedType": "FLIGHT",
+    "expectedTitle": "Flight EK 003 \u00b7 DXB\u2192LHR"
+  },
+  {
+    "id": "airbnb-tokyo",
+    "from": "automated@airbnb.com",
+    "subject": "Reservation confirmed \u2013 Shinjuku Studio",
+    "text": "You're going to Shinjuku Studio, Tokyo!\nConfirmation code: HMQX4K9B2\n\nCheck-in: Saturday, August 13, 2026\nCheck-out: Saturday, August 19, 2026\nGuests: 1\n\nHost: Yuki\nPrice: \u00a542,000 total\n",
+    "expectedType": "LODGING",
+    "expectedTitle": "Shinjuku Studio, Tokyo"
+  },
+  {
+    "id": "viator-teamlab",
+    "from": "bookings@viator.com",
+    "subject": "Your Viator booking is confirmed \u2013 teamLab Planets Tokyo",
+    "text": "Viator Booking Confirmation\n\nActivity: teamLab Planets Tokyo\nDate: August 14, 2026\nTime: 10:00 AM\nDuration: 2 hours\nBooking reference: V-8827364\n\nMeeting point: 6-1-16 Toyosu, Koto City, Tokyo\n",
+    "expectedType": "ACTIVITY",
+    "expectedTitle": "teamLab Planets Tokyo"
+  },
+  {
+    "id": "booking-hotel-bangkok",
+    "from": "noreply@booking.com",
+    "subject": "Booking confirmation \u2013 Mandarin Oriental Bangkok",
+    "text": "Booking confirmation\nYour reservation at Mandarin Oriental Bangkok is confirmed.\nConfirmation: BK-112938\n\nCheck-in: October 3, 2026\nCheck-out: October 7, 2026\nRoom: Deluxe River View\n\nTotal: THB 48,000\n",
+    "expectedType": "LODGING",
+    "expectedTitle": "Mandarin Oriental Bangkok"
+  },
+  {
+    "id": "flyadeal-flight",
+    "from": "noreply@flyadeal.com",
+    "subject": "Booking Confirmation \u2013 F3 101 Riyadh to Jeddah",
+    "text": "flyadeal Booking Confirmation\n\nFlight F3 101\nRUH \u2192 JED\nDeparture date: September 20, 2026\nDeparture time: 07:15\n\nPassenger: Ahmed Al-Hakeem\nBooking reference: FAD9283\nClass: Economy\n",
+    "expectedType": "FLIGHT",
+    "expectedTitle": "Flight F3 101 \u00b7 RUH\u2192JED"
+  },
+  {
+    "id": "viator-safari",
+    "from": "bookings@viator.com",
+    "subject": "Booking confirmed \u2013 Desert Safari Dubai with BBQ Dinner",
+    "text": "Viator Booking Confirmation\n\nActivity: Desert Safari Dubai with BBQ Dinner\nDate: December 16, 2026\nTime: 03:30 PM\nBooking reference: V-9938271\nDuration: 6 hours\n\nPickup: Hotel lobby\n",
+    "expectedType": "ACTIVITY",
+    "expectedTitle": "Desert Safari Dubai with BBQ Dinner"
+  },
+  {
+    "id": "airbnb-bangkok",
+    "from": "automated@airbnb.com",
+    "subject": "Reservation confirmed \u2013 Modern Condo Sukhumvit",
+    "text": "You're going to Modern Condo Sukhumvit, Bangkok!\nConfirmation code: AX8TY2PQ6\n\nCheck-in: Wednesday, October 3, 2026\nCheck-out: Monday, October 7, 2026\nGuests: 2\n\nHost: Aem\nPrice: \u0e3f12,000 total\n",
+    "expectedType": "LODGING",
+    "expectedTitle": "Modern Condo Sukhumvit, Bangkok"
+  },
+  {
+    "id": "saudia-flight-jed-cai",
+    "from": "noreply@saudia.com",
+    "subject": "E-Ticket Itinerary \u2013 SV 262 Jeddah to Cairo",
+    "text": "E-Ticket Itinerary Receipt\nSaudi Arabian Airlines\n\nPassenger: Ahmed Al-Hakeem\nPNR: BRTQ91\n\nFlight SV 262\nJED \u2192 CAI\nDeparture date: March 3, 2027\nDeparture time: 14:30\n\nClass: Business\nBaggage: 40kg included\n",
+    "expectedType": "FLIGHT",
+    "expectedTitle": "Flight SV 262 \u00b7 JED\u2192CAI"
+  }
+]
