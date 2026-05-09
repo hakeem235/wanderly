@@ -1,0 +1,10 @@
+{
+  "extends": "@wanderly/config/tsconfig",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": [
+    "src"
+  ]
+}

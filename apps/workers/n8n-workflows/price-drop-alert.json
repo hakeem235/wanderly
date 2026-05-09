@@ -1,0 +1,52 @@
+{
+  "name": "Wanderly — Price Drop Alert",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "hours", "minutesInterval": 24 }]
+        }
+      },
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.APP_URL }}/api/alerts/price-drop",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-alert-secret", "value": "={{ $env.ALERT_WEBHOOK_SECRET }}" },
+            { "name": "Content-Type",   "value": "application/json" }
+          ]
+        },
+        "options": { "timeout": 55000 }
+      },
+      "name": "Trigger Price Drop Check",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "console.log(`Price drop check complete. Checked: ${$input.item.json.checked}, Alerted: ${$input.item.json.alerted}`);\nreturn $input.item;"
+      },
+      "name": "Log result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger":        { "main": [[{ "node": "Trigger Price Drop Check", "type": "main", "index": 0 }]] },
+    "Trigger Price Drop Check": { "main": [[{ "node": "Log result",              "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": ["wanderly", "alerts"],
+  "meta": {
+    "description": "Runs daily. Calls /api/alerts/price-drop which checks all QUOTED flight segments, re-fetches live pricing, and emails users for any price drop >5%.\n\nRequired n8n env vars:\n  APP_URL              — e.g. https://app.wanderly.co\n  ALERT_WEBHOOK_SECRET — must match .env.local"
+  }
+}

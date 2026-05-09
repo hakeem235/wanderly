@@ -7,6 +7,7 @@ import { AddSegmentDialog } from "@/components/trips/add-segment-dialog";
 import { ShareButton } from "@/components/trips/share-button";
 import { DeleteTripButton } from "@/components/trips/delete-trip-button";
 import { TripMap } from "@/components/trips/trip-map";
+import { formatCurrency } from "@/lib/format-currency";
 
 const STATUS_LABELS: Record<string, string> = {
   PLANNING: "Planning", BOOKED: "Booked", ONGOING: "Ongoing",
@@ -158,7 +159,7 @@ export default async function TripDetailPage({ params }: { params: { id: string 
             <div className="rounded-xl border border-line bg-paper p-4">
               <p className="font-mono text-[10px] uppercase tracking-badge text-ink-mute mb-1">Budget</p>
               <p className="font-display text-display-xs text-ink">
-                {tripData.currency} {(tripData.budgetCents / 100).toLocaleString()}
+                {formatCurrency(tripData.budgetCents, tripData.currency)}
               </p>
             </div>
           )}

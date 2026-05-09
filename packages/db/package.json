@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "seed": "tsx src/seed.ts",
+    "seed:invites": "tsx src/seed-invites.ts",
+    "seed:destinations": "tsx -e \"import('./src/seed.ts').then(m => m.seedDestinations().then(() => process.exit(0)))\"  ",
     "typecheck": "tsc --noEmit"
   },
   "exports": {

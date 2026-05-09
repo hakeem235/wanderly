@@ -1,0 +1,21 @@
+{
+  "name": "@wanderly/ai",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@wanderly/db": "workspace:*",
+    "@wanderly/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "@wanderly/config": "workspace:*",
+    "@types/node": "^20.16.5",
+    "typescript": "^5.5.4"
+  }
+}

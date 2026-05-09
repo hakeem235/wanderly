@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { formatCurrency } from "@/lib/format-currency";
 
 export type TripCardData = {
   id: string;
@@ -94,8 +95,7 @@ export function TripCard({ trip }: { trip: TripCardData }) {
           <p className="mt-2 font-mono text-xs text-ink-mute">
             Budget:{" "}
             <span className="text-ink">
-              {trip.currency}{" "}
-              {(trip.budgetCents / 100).toLocaleString()}
+              {formatCurrency(trip.budgetCents, trip.currency)}
             </span>
           </p>
         )}

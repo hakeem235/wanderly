@@ -1,0 +1,63 @@
+{
+  "nav": {
+    "plan": "التخطيط",
+    "newTrip": "رحلة جديدة",
+    "search": "ابحث عن رحلات…"
+  },
+  "dashboard": {
+    "greeting_morning": "صباح الخير",
+    "greeting_afternoon": "مساء الخير",
+    "greeting_evening": "مساء الخير",
+    "upcoming": "القادمة",
+    "total": "إجمالي الرحلات",
+    "destinations": "الوجهات",
+    "completed": "المكتملة",
+    "emptyState": "لا توجد رحلات بعد — ابدأ بالتخطيط لأولى مغامراتك.",
+    "createTrip": "أنشئ رحلة"
+  },
+  "trip": {
+    "budget": "الميزانية",
+    "status": "الحالة",
+    "share": "مشاركة",
+    "delete": "حذف الرحلة",
+    "addSegment": "إضافة مقطع",
+    "noSegments": "لا توجد مقاطع بعد. أضف رحلة جوية أو فندقاً أو نشاطاً للبدء."
+  },
+  "search": {
+    "origin": "من",
+    "destination": "إلى",
+    "departDate": "المغادرة",
+    "returnDate": "العودة",
+    "adults": "البالغون",
+    "cabin": "الدرجة",
+    "searchFlights": "ابحث عن رحلات",
+    "filters": "الفلاتر",
+    "stops": "التوقفات",
+    "maxPrice": "الحد الأقصى للسعر",
+    "refundableOnly": "قابل للاسترداد فقط",
+    "bestValue": "أفضل قيمة",
+    "saveToTrip": "حفظ في الرحلة",
+    "bookNow": "احجز الآن"
+  },
+  "plan": {
+    "title": "خطّط رحلتك",
+    "subtitle": "مساعد الكونسيرج · مدعوم بـ Claude",
+    "placeholder": "صف رحلتك المثالية والتواريخ والميزانية…",
+    "send": "إرسال",
+    "thinking": "جارٍ التفكير…",
+    "selectTrip": "اختر رحلة",
+    "limitNote": "اضغط Enter للإرسال · Shift+Enter لسطر جديد"
+  },
+  "offline": {
+    "title": "أنت غير متصل",
+    "body": "لا يوجد اتصال بالإنترنت. رحلاتك المحفوظة لا تزال متاحة.",
+    "cta": "عرض الرحلات المحفوظة"
+  },
+  "common": {
+    "loading": "جارٍ التحميل…",
+    "error": "حدث خطأ ما",
+    "cancel": "إلغاء",
+    "save": "حفظ",
+    "back": "رجوع"
+  }
+}

@@ -66,3 +66,9 @@ export type { DocumentDoc, DocType } from "./models/document";
 
 export { Passkey } from "./models/passkey";
 export type { PasskeyDoc } from "./models/passkey";
+
+export { Destination } from "./models/destination";
+export type { DestinationDoc } from "./models/destination";
+
+export { InviteCode } from "./models/invite-code";
+export type { InviteCodeDoc } from "./models/invite-code";

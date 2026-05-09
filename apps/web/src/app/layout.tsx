@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { Fraunces, DM_Sans, JetBrains_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
+import { getLocale } from "next-intl/server";
+import { NextIntlClientProvider } from "next-intl";
+import { isRTL } from "@/i18n";
 import "./globals.css";
 
 const fraunces = Fraunces({
@@ -42,18 +45,25 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
+  const locale = await getLocale();
+  const messages = (await import(`../messages/${locale}.json`)).default;
+  const dir = isRTL(locale) ? "rtl" : "ltr";
+
   return (
     <ClerkProvider>
       <html
-        lang="en"
+        lang={locale}
+        dir={dir}
         className={`${fraunces.variable} ${dmSans.variable} ${jetbrainsMono.variable}`}
       >
-        <body>{children}</body>
+        <body>
+          <NextIntlClientProvider locale={locale} messages={messages}>
+            {children}
+          </NextIntlClientProvider>
+        </body>
       </html>
     </ClerkProvider>
   );

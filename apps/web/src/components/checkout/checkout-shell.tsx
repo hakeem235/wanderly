@@ -30,7 +30,7 @@ interface CheckoutShellProps {
 export function CheckoutShell({ tripId, tripTitle, offerJson }: CheckoutShellProps) {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [bookingId,    setBookingId]    = useState<string | null>(null);
-  const [offer,        setOffer]        = useState<FlightOffer | null>(() => {
+  const [offer]        = useState<FlightOffer | null>(() => {
     try { return JSON.parse(decodeURIComponent(offerJson)) as FlightOffer; } catch { return null; }
   });
 

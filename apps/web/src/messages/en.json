@@ -1,0 +1,63 @@
+{
+  "nav": {
+    "plan": "Plan",
+    "newTrip": "New trip",
+    "search": "Search flights…"
+  },
+  "dashboard": {
+    "greeting_morning": "Good morning",
+    "greeting_afternoon": "Good afternoon",
+    "greeting_evening": "Good evening",
+    "upcoming": "Upcoming",
+    "total": "Total trips",
+    "destinations": "Destinations",
+    "completed": "Completed",
+    "emptyState": "No trips yet — start planning your first adventure.",
+    "createTrip": "Create a trip"
+  },
+  "trip": {
+    "budget": "Budget",
+    "status": "Status",
+    "share": "Share",
+    "delete": "Delete trip",
+    "addSegment": "Add segment",
+    "noSegments": "No segments yet. Add a flight, hotel, or activity to get started."
+  },
+  "search": {
+    "origin": "From",
+    "destination": "To",
+    "departDate": "Depart",
+    "returnDate": "Return",
+    "adults": "Adults",
+    "cabin": "Cabin",
+    "searchFlights": "Search flights",
+    "filters": "Filters",
+    "stops": "Stops",
+    "maxPrice": "Max price",
+    "refundableOnly": "Refundable only",
+    "bestValue": "BEST VALUE",
+    "saveToTrip": "Save to trip",
+    "bookNow": "Book now"
+  },
+  "plan": {
+    "title": "Plan your trip",
+    "subtitle": "AI concierge · powered by Claude",
+    "placeholder": "Describe your ideal trip, dates, budget…",
+    "send": "Send",
+    "thinking": "Thinking…",
+    "selectTrip": "Select a trip",
+    "limitNote": "Press Enter to send · Shift+Enter for new line · Max 12 tool calls per session"
+  },
+  "offline": {
+    "title": "You're offline",
+    "body": "No internet connection. Your cached trips are still available.",
+    "cta": "View cached trips"
+  },
+  "common": {
+    "loading": "Loading…",
+    "error": "Something went wrong",
+    "cancel": "Cancel",
+    "save": "Save",
+    "back": "Back"
+  }
+}
