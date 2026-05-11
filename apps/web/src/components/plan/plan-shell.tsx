@@ -121,6 +121,7 @@ export function PlanShell({
   const [inputText, setInputText]           = useState("");
   const [sessionId, setSessionId]           = useState<string | undefined>(undefined);
   const [isStreaming, setIsStreaming]       = useState(false);
+  const [proRequired, setProRequired]       = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -147,6 +148,14 @@ export function PlanShell({
           sessionId,
         }),
       });
+
+      if (res.status === 402) {
+        setProRequired(true);
+        // Remove the optimistic assistant message
+        setMessages((prev) => prev.slice(0, -2));
+        setIsStreaming(false);
+        return;
+      }
 
       if (!res.ok || !res.body) {
         throw new Error(`HTTP ${res.status}`);
@@ -319,6 +328,24 @@ export function PlanShell({
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Pro upgrade banner */}
+      {proRequired && (
+        <div className="border-t border-terracotta/30 bg-paper-warm px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-ink">AI planning requires Wanderly Pro</p>
+            <p className="text-xs text-ink-mute mt-0.5">
+              Upgrade to unlock the AI concierge — live flight and hotel search, day-by-day plans.
+            </p>
+          </div>
+          <a
+            href="/upgrade"
+            className="flex-shrink-0 inline-flex items-center gap-1.5 bg-terracotta hover:bg-terracotta-deep text-cream text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+          >
+            Upgrade to Pro →
+          </a>
+        </div>
+      )}
+
       {/* Input */}
       <div className="border-t border-line bg-cream px-6 py-4">
         {!selectedTripId && (
@@ -332,11 +359,11 @@ export function PlanShell({
             placeholder="Describe your ideal trip, dates, budget…"
             className="resize-none min-h-[44px] max-h-32 bg-paper border-line text-sm"
             rows={2}
-            disabled={isStreaming || !selectedTripId}
+            disabled={isStreaming || !selectedTripId || proRequired}
           />
           <Button
             onClick={() => send(inputText)}
-            disabled={!inputText.trim() || isStreaming || !selectedTripId}
+            disabled={!inputText.trim() || isStreaming || !selectedTripId || proRequired}
             className="bg-terracotta hover:bg-terracotta-deep text-cream h-11 px-4 flex-shrink-0"
           >
             {isStreaming ? (

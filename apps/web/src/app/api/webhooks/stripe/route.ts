@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { clerkClient } from "@clerk/nextjs/server";
 import { stripe } from "@/lib/stripe";
-import { connectDB, Booking, Segment } from "@wanderly/db";
+import { connectDB, Booking, Segment, Subscription } from "@wanderly/db";
 import { canTransition } from "@/lib/booking/state-machine";
 import { sendBookingConfirmation } from "@/lib/email/send-booking-confirmation";
 import { withSpan } from "@/lib/tracing";
@@ -41,20 +41,17 @@ export async function POST(req: NextRequest) {
           booking.confirmedAt = new Date();
           await booking.save();
 
-          // Update the QUOTED segment to CONFIRMED
           await Segment.updateOne(
             { tripId: booking.tripId, "payload.offerId": booking.providerRef },
             { $set: { "payload.status": "CONFIRMED", "payload.confirmedAt": new Date() } }
           );
 
-          // Send confirmation email (best-effort)
           try {
             const raw = booking.rawOffer as Record<string, unknown>;
             const slices = (raw.slices ?? []) as Array<Record<string, string | number>>;
             const first  = slices[0];
             const last   = slices[slices.length - 1] ?? first;
 
-            // Look up user email from Clerk
             const clerk = await clerkClient();
             const user  = await clerk.users.getUser(booking.userId as string);
             const toEmail = user.emailAddresses[0]?.emailAddress;
@@ -86,7 +83,7 @@ export async function POST(req: NextRequest) {
         break;
       }
 
-      // ── Payment failed → FAILED + auto-refund if needed ─────────────────────
+      // ── Payment failed → FAILED ──────────────────────────────────────────────
       case "payment_intent.payment_failed": {
         const pi = event.data.object as { id: string };
         const booking = await Booking.findOne({ stripePiId: pi.id });
@@ -110,6 +107,53 @@ export async function POST(req: NextRequest) {
           booking.status = "CANCELLED";
           await booking.save();
         }
+        break;
+      }
+
+      // ── Subscription created/updated → sync plan ─────────────────────────────
+      case "customer.subscription.created":
+      case "customer.subscription.updated": {
+        const sub = event.data.object as {
+          id: string;
+          customer: string;
+          status: string;
+          current_period_end: number;
+          cancel_at_period_end: boolean;
+          items: { data: Array<{ price: { metadata?: Record<string, string> } }> };
+        };
+
+        // Plan is read from Stripe price metadata — set price.metadata.plan = "PRO" or "TEAM"
+        const priceMeta = sub.items.data[0]?.price?.metadata ?? {};
+        const plan = priceMeta.plan === "TEAM" ? "TEAM" : "PRO";
+        const isActive = ["active", "trialing"].includes(sub.status);
+
+        await Subscription.updateOne(
+          { stripeCustomerId: sub.customer },
+          {
+            $set: {
+              stripeSubId:       sub.id,
+              plan:              isActive ? plan : "FREE",
+              currentPeriodEnd:  new Date(sub.current_period_end * 1000),
+              cancelAtPeriodEnd: sub.cancel_at_period_end,
+            },
+          }
+        );
+        break;
+      }
+
+      // ── Subscription deleted → downgrade to FREE ─────────────────────────────
+      case "customer.subscription.deleted": {
+        const sub = event.data.object as { id: string; customer: string };
+        await Subscription.updateOne(
+          { stripeCustomerId: sub.customer },
+          {
+            $set: {
+              plan:              "FREE",
+              stripeSubId:       sub.id,
+              cancelAtPeriodEnd: false,
+            },
+          }
+        );
         break;
       }
 

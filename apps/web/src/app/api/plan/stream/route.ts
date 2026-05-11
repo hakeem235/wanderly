@@ -5,6 +5,7 @@ import { connectDB, Trip } from "@wanderly/db";
 import { runAgent, encodeSSE } from "@wanderly/ai";
 import { createServerSearchClient } from "@wanderly/sdk";
 import { withSpan } from "@/lib/tracing";
+import { hasProAccess } from "@/lib/subscription";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120; // 2 min
@@ -19,6 +20,15 @@ export async function POST(req: NextRequest) {
   const { userId } = await auth();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // ── Pro plan gate ──────────────────────────────────────────────────────────
+  const isPro = await hasProAccess(userId);
+  if (!isPro) {
+    return NextResponse.json(
+      { error: "PRO_REQUIRED", message: "AI itinerary planning requires a Wanderly Pro subscription." },
+      { status: 402 }
+    );
   }
 
   let body: z.infer<typeof BodySchema>;

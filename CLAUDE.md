@@ -178,7 +178,7 @@ Do not skip ahead. Each phase ships to a deployed preview environment before the
 - [x] System prompt enforces grounding rules (no inventory hallucination)
 - [x] SSE-streamed planning UI (`/plan`) — tool calls visible as badges, generated plan rendering live
 - [x] Cost guardrails: max 12 tool calls per session, $0.30 budget cap, 200k/8k token limits enforced in code
-- [ ] Pro plan gating via Stripe Subscriptions — deferred to Phase 7 polish
+- [x] Pro plan gating via Stripe Subscriptions — `hasProAccess()` guard on `/api/plan/stream`; `/upgrade` page; `/api/billing/create-checkout` + `/api/billing/portal`; subscription webhook handlers
 
 **DoD:** ✅ Navigate to `/plan`, select a trip, describe your itinerary request → tool calls stream live, plan saves to DB via `save_itinerary`.
 
@@ -501,6 +501,8 @@ Phases 1–7 are complete. The product is ready for closed beta. When resuming w
 **Search service note:** Go module at `apps/search/` — uses chi v5.0.12 and go-redis/v8 (pinned for Go 1.20 compat). SDK codegen: `pnpm --filter @wanderly/sdk generate`. `/api/search/flights` proxies via `createServerSearchClient()` from `@wanderly/sdk`.
 
 **Mapbox note:** Token is `NEXT_PUBLIC_MAPBOX_TOKEN`. `TripMap` does IATA→coords lookup for flight arcs — extend `IATA_COORDS` in `trip-map.tsx` for new airports.
+
+**Billing note:** `STRIPE_PRO_PRICE_ID` in `.env.local` — set this to your Stripe PRO price ID (subscription). Set `price.metadata.plan = "PRO"` on the price in the Stripe dashboard so the webhook knows which plan to assign. Checkout flow: `POST /api/billing/create-checkout` → Stripe Checkout → redirect to `/plan?upgraded=1`. Manage existing subscription: `POST /api/billing/portal`. Webhook handles `customer.subscription.created/updated/deleted` to sync plan to MongoDB.
 
 **Stripe note:** API version `2026-04-22.dahlia`. Idempotency layer uses `redis` npm package, keyed `userId:idempotencyKey`. Webhook at `/api/webhooks/stripe` — add to Stripe dashboard. Confirmation email sent via Resend on CONFIRMED transition.
 
